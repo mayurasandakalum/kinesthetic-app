@@ -12,24 +12,13 @@
 <div class="container">
   <div class="jumbotron my-4">
     <h3 class="text-info">{{ question.html|safe }}</h3>
-    <form class="form" action="" method="post">
+    <form class="form" method="post">
       {{ form.hidden_tag() }}
       <input type="hidden" name="question_pk" value="{{ question.pk }}" />
-      {% for choice in question.choices %}
-      <div class="form-check mx-4">
-        <input
-          class="form-check-input"
-          type="radio"
-          name="choice_pk"
-          id="choice-{{ loop.index }}"
-          value="{{ choice.pk }}"
-        />
-        <label class="form-check-label" for="choice-{{ loop.index }}">
-          {{ choice.html|safe }}
-        </label>
+      {{ form.choice_pk }}
+      <div class="form-group mt-4">
+        <input class="btn btn-info btn-lg" type="submit" value="Submit" />
       </div>
-      {% endfor %}
-      <input class="btn btn-info btn-lg" type="submit" value="Submit" />
     </form>
   </div>
 </div>

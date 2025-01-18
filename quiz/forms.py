@@ -1,5 +1,12 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField, EmailField
+from wtforms import (
+    StringField,
+    PasswordField,
+    SubmitField,
+    BooleanField,
+    EmailField,
+    RadioField,
+)
 from wtforms.validators import DataRequired, Email, EqualTo
 
 
@@ -19,3 +26,7 @@ class RegistrationForm(FlaskForm):
         "Repeat Password", validators=[DataRequired(), EqualTo("password")]
     )
     submit = SubmitField("Register")
+
+
+class QuizForm(FlaskForm):
+    choice_pk = RadioField("Choice", validators=[DataRequired()])
