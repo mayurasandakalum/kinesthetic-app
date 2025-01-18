@@ -15,9 +15,9 @@ def create_app():
     # Initialize CSRF protection
     csrf.init_app(app)
 
-    # Initialize login manager
+    # Initialize login manager with correct login view
     login_manager.init_app(app)
-    login_manager.login_view = "login"
+    login_manager.login_view = "quiz.login"  # Changed from "login" to "quiz.login"
 
     from quiz.routes import quiz_blueprint
 

@@ -79,17 +79,23 @@ class User(UserMixin):
 
 
 class QuizProfile:
-    def __init__(self, user_id, total_score=0.0):
+    def __init__(self, user_id, total_score=0.0, created=None, modified=None):
         self.user_id = user_id
         self.total_score = total_score
-        self.created = datetime.utcnow()
-        self.modified = datetime.utcnow()
+        self.created = created if created else datetime.utcnow()
+        self.modified = modified if modified else datetime.utcnow()
 
     @staticmethod
     def get_by_user_id(user_id):
         profile = db.collection("quiz_profiles").document(str(user_id)).get()
         if profile.exists:
-            return QuizProfile(**profile.to_dict())
+            data = profile.to_dict()
+            return QuizProfile(
+                user_id=data.get("user_id"),
+                total_score=data.get("total_score", 0.0),
+                created=data.get("created"),
+                modified=data.get("modified"),
+            )
         return None
 
     def save(self):
