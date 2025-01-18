@@ -84,6 +84,7 @@ class QuizProfile:
         self.total_score = total_score
         self.created = created if created else datetime.utcnow()
         self.modified = modified if modified else datetime.utcnow()
+        self._user = None  # Cache for user object
 
     @staticmethod
     def get_by_user_id(user_id):
@@ -125,10 +126,34 @@ class QuizProfile:
             return Question.from_doc(question)
         return None
 
-    def evaluate_attempt(self, attempted_question, selected_choice):
-        # Implementation for Firebase
-        # ...existing evaluation logic...
-        pass
+    def evaluate_attempt(self, attempted_question):
+        # Get the selected choice
+        choice_ref = (
+            db.collection("choices")
+            .document(attempted_question.selected_choice_id)
+            .get()
+        )
+        if not choice_ref.exists:
+            return False
+
+        choice_data = choice_ref.to_dict()
+        is_correct = choice_data.get("is_correct", False)
+
+        if is_correct:
+            self.total_score += 1
+            self.modified = datetime.utcnow()
+            self.save()
+
+        return is_correct
+
+    def get_user(self):
+        if self._user is None:
+            self._user = User.get_by_id(self.user_id)
+        return self._user
+
+    @property
+    def user(self):
+        return self.get_user()
 
 
 class Question:
@@ -164,6 +189,10 @@ class Question:
             ref = db.collection("questions").add(data)
             self.id = ref[1].id
 
+    @property
+    def choices(self):
+        return Choice.get_by_question(self.id)
+
 
 class Choice:
     def __init__(self, id=None, question_id=None, text="", is_correct=False):
@@ -191,6 +220,25 @@ class Choice:
         choice.created = data.get("created", datetime.utcnow())
         choice.modified = data.get("modified", datetime.utcnow())
         return choice
+
+    def save(self):
+        data = {
+            "question_id": self.question_id,
+            "text": self.text,
+            "is_correct": self.is_correct,
+            "created": self.created,
+            "modified": self.modified,
+        }
+        if self.id:
+            db.collection("choices").document(self.id).set(data)
+        else:
+            ref = db.collection("choices").add(data)
+            self.id = ref[1].id
+
+    @property
+    def html(self):
+        """Return the choice text as safe HTML"""
+        return self.text
 
 
 class AttemptedQuestion:

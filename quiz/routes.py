@@ -50,24 +50,44 @@ def play():
         quiz_profile = QuizProfile(user_id=current_user.id)
         quiz_profile.save()
 
-    form = QuizForm()
-    question = quiz_profile.get_new_question()
-    if question:
-        choices = Choice.get_by_question(question.id)
-        form.choice_pk.choices = [(str(choice.id), choice.text) for choice in choices]
-
     if request.method == "POST":
         question_id = request.form.get("question_pk")
         choice_id = request.form.get("choice_pk")
+
+        # Get the selected choice and check if it's correct
+        choices = db.collection("choices").where("question_id", "==", question_id).get()
+        selected_choice = None
+        is_correct = False
+
+        for choice in choices:
+            if choice.id == choice_id:
+                selected_choice = choice.to_dict()
+                is_correct = selected_choice.get("is_correct", False)
+                break
+
+        # Save the attempt
         attempted = AttemptedQuestion(
             user_id=current_user.id,
             question_id=question_id,
             selected_choice_id=choice_id,
+            is_correct=is_correct,
         )
         attempted.save()
+
+        # Update user's score if answer is correct
+        if is_correct:
+            quiz_profile.total_score += 1
+            quiz_profile.save()
+
         return redirect(url_for("quiz.play"))
 
-    return render_template("quiz/play.html", question=question, form=form)
+    # Get a new question
+    question = quiz_profile.get_new_question()
+    if question:
+        choices = Choice.get_by_question(question.id)
+        return render_template("quiz/play.html", question=question, choices=choices)
+
+    return render_template("quiz/play.html", question=None)
 
 
 @quiz_blueprint.route("/submission-result/<int:attempted_question_pk>")

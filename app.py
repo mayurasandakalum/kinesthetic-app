@@ -20,8 +20,13 @@ def create_app():
     login_manager.login_view = "quiz.login"  # Changed from "login" to "quiz.login"
 
     from quiz.routes import quiz_blueprint
+    from quiz.utils import load_initial_questions
 
     app.register_blueprint(quiz_blueprint)
+
+    # Load initial questions if they don't exist
+    with app.app_context():
+        load_initial_questions()
 
     @app.errorhandler(404)
     def not_found(e):
