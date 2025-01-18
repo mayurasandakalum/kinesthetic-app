@@ -4,10 +4,20 @@ import random
 from firebase_admin import firestore
 import firebase_admin
 from firebase_admin import credentials
+import os
+
+# Get the absolute path to the credentials file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+cred_path = os.path.join(project_root, "serviceAccountKey.json")
 
 # Initialize Firebase
-cred = credentials.Certificate("path/to/your/serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
+cred = credentials.Certificate(cred_path)
+try:
+    firebase_admin.initialize_app(cred)
+except ValueError:
+    # App already initialized
+    pass
 db = firestore.client()
 
 
