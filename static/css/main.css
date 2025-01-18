@@ -11,18 +11,3 @@
 .btn-lg {
     margin-top: 1.5rem;
 }
-
-/* Style for quiz choices */
-.radio-field {
-    display: block;
-    margin: 1rem 0;
-}
-
-.radio-field input[type="radio"] {
-    margin-right: 10px;
-}
-
-.radio-field label {
-    display: inline-block;
-    margin-bottom: 0.5rem;
-}

@@ -49,32 +49,26 @@ def play():
     question = quiz_profile.get_new_question()
     if question:
         form.choice_pk.choices = [
-            (str(choice.pk), choice.html) for choice in question.choices
+            (str(choice.id), choice.html) for choice in question.choices
         ]
 
-    if form.validate_on_submit():
+    if request.method == "POST":
         question_pk = request.form.get("question_pk")
         attempted_question = AttemptedQuestion.query.filter_by(
             quiz_profile_id=quiz_profile.id, question_id=question_pk
         ).first()
-
-        if attempted_question and form.choice_pk.data:
-            selected_choice = Choice.query.get(form.choice_pk.data)
-            if selected_choice:
-                quiz_profile.evaluate_attempt(attempted_question, selected_choice)
-                return redirect(
-                    url_for(
-                        "quiz.submission_result",
-                        attempted_question_pk=attempted_question.id,
-                    )
-                )
-
-        flash("Please select an answer", "warning")
-        return redirect(url_for("quiz.play"))
-
-    if question is not None:
-        quiz_profile.create_attempt(question)
-    return render_template("quiz/play.html", question=question, form=form)
+        choice_pk = request.form.get("choice_pk")
+        selected_choice = Choice.query.get(choice_pk)
+        quiz_profile.evaluate_attempt(attempted_question, selected_choice)
+        return redirect(
+            url_for(
+                "quiz.submission_result", attempted_question_pk=attempted_question.id
+            )
+        )
+    else:
+        if question is not None:
+            quiz_profile.create_attempt(question)
+        return render_template("quiz/play.html", question=question, form=form)
 
 
 @quiz_blueprint.route("/submission-result/<int:attempted_question_pk>")
