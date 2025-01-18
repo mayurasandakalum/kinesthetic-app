@@ -1,9 +1,12 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
+from firebase_admin import firestore
 
-from .models import db, User, QuizProfile, Question, AttemptedQuestion, Choice
+from .models import User, QuizProfile, Question, AttemptedQuestion, Choice
 from .forms import UserLoginForm, RegistrationForm, QuizForm
+
+db = firestore.client()
 
 quiz_blueprint = Blueprint(
     "quiz", __name__, template_folder="../templates/quiz", static_folder="../static"
@@ -23,10 +26,14 @@ def user_home():
 
 @quiz_blueprint.route("/leaderboard")
 def leaderboard():
-    # Let's fetch top 500
-    top_quiz_profiles = (
-        QuizProfile.query.order_by(QuizProfile.total_score.desc()).limit(500).all()
+    # Get all quiz profiles and sort by total_score
+    profiles_ref = (
+        db.collection("quiz_profiles")
+        .order_by("total_score", direction=firestore.Query.DESCENDING)
+        .limit(500)
     )
+    profiles = profiles_ref.get()
+    top_quiz_profiles = [QuizProfile(**profile.to_dict()) for profile in profiles]
     total_count = len(top_quiz_profiles)
     return render_template(
         "quiz/leaderboard.html",
@@ -38,37 +45,29 @@ def leaderboard():
 @quiz_blueprint.route("/play", methods=["GET", "POST"])
 @login_required
 def play():
-    quiz_profile = current_user.quiz_profile
+    quiz_profile = QuizProfile.get_by_user_id(current_user.id)
     if not quiz_profile:
-        # If user has no quiz_profile yet, create one
         quiz_profile = QuizProfile(user_id=current_user.id)
-        db.session.add(quiz_profile)
-        db.session.commit()
+        quiz_profile.save()
 
     form = QuizForm()
     question = quiz_profile.get_new_question()
     if question:
-        form.choice_pk.choices = [
-            (str(choice.id), choice.html) for choice in question.choices
-        ]
+        choices = Choice.get_by_question(question.id)
+        form.choice_pk.choices = [(str(choice.id), choice.text) for choice in choices]
 
     if request.method == "POST":
-        question_pk = request.form.get("question_pk")
-        attempted_question = AttemptedQuestion.query.filter_by(
-            quiz_profile_id=quiz_profile.id, question_id=question_pk
-        ).first()
-        choice_pk = request.form.get("choice_pk")
-        selected_choice = Choice.query.get(choice_pk)
-        quiz_profile.evaluate_attempt(attempted_question, selected_choice)
-        return redirect(
-            url_for(
-                "quiz.submission_result", attempted_question_pk=attempted_question.id
-            )
+        question_id = request.form.get("question_pk")
+        choice_id = request.form.get("choice_pk")
+        attempted = AttemptedQuestion(
+            user_id=current_user.id,
+            question_id=question_id,
+            selected_choice_id=choice_id,
         )
-    else:
-        if question is not None:
-            quiz_profile.create_attempt(question)
-        return render_template("quiz/play.html", question=question, form=form)
+        attempted.save()
+        return redirect(url_for("quiz.play"))
+
+    return render_template("quiz/play.html", question=question, form=form)
 
 
 @quiz_blueprint.route("/submission-result/<int:attempted_question_pk>")
@@ -84,9 +83,10 @@ def submission_result(attempted_question_pk):
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("quiz.home"))
+
     form = UserLoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        user = User.get_by_username(form.username.data)
         if user and check_password_hash(user.password_hash, form.password.data):
             login_user(user)
             return redirect(url_for("quiz.user_home"))
@@ -99,28 +99,32 @@ def login():
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("quiz.home"))
+
     form = RegistrationForm()
     if form.validate_on_submit():
-        # Create user
-        hashed_pw = generate_password_hash(form.password.data)
+        user = User.get_by_username(form.username.data)
+        if user:
+            flash("Username already exists")
+            return redirect(url_for("quiz.register"))
+
+        password_hash = generate_password_hash(form.password.data)
         new_user = User(
             username=form.username.data,
             email=form.email.data,
             first_name=form.first_name.data,
             last_name=form.last_name.data,
-            password_hash=hashed_pw,
+            password_hash=password_hash,
         )
-        db.session.add(new_user)
-        db.session.commit()
 
-        # Optionally create QuizProfile right away
+        new_user.save()
+
         quiz_profile = QuizProfile(user_id=new_user.id)
-        db.session.add(quiz_profile)
-        db.session.commit()
+        quiz_profile.save()
 
-        flash("Registration successful. Please login.", "success")
+        flash("Registration successful!")
         return redirect(url_for("quiz.login"))
-    return render_template("quiz/registration.html", form=form, title="Create account")
+
+    return render_template("quiz/registration.html", form=form, title="Register")
 
 
 @quiz_blueprint.route("/logout")
