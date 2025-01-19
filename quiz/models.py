@@ -156,10 +156,25 @@ class QuizProfile:
         return self.get_user()
 
 
+class AnswerMethod:
+    ABACUS = "abacus"
+    ANALOG_CLOCK = "analog_clock"
+    DIGITAL_CLOCK = "digital_clock"
+
+    CHOICES = [
+        (ABACUS, "Abacus"),
+        (ANALOG_CLOCK, "Analog Clock"),
+        (DIGITAL_CLOCK, "Digital Clock"),
+    ]
+
+
 class Question:
-    def __init__(self, id=None, text="", is_published=False):
+    def __init__(
+        self, id=None, text="", answer_method=AnswerMethod.ABACUS, is_published=False
+    ):
         self.id = id
-        self.text = text
+        self.text = text  # This will be the main question/description
+        self.answer_method = answer_method
         self.is_published = is_published
         self.created = datetime.utcnow()
         self.modified = datetime.utcnow()
@@ -170,6 +185,7 @@ class Question:
         question = Question(
             id=doc.id,
             text=data.get("text", ""),
+            answer_method=data.get("answer_method", AnswerMethod.ABACUS),
             is_published=data.get("is_published", False),
         )
         question.created = data.get("created", datetime.utcnow())
@@ -179,6 +195,7 @@ class Question:
     def save(self):
         data = {
             "text": self.text,
+            "answer_method": self.answer_method,
             "is_published": self.is_published,
             "created": self.created,
             "modified": self.modified,
@@ -190,71 +207,111 @@ class Question:
             self.id = ref[1].id
 
     @property
-    def choices(self):
-        return Choice.get_by_question(self.id)
+    def sub_questions(self):
+        return SubQuestion.get_by_question(self.id)
 
 
-class Choice:
-    def __init__(self, id=None, question_id=None, text="", is_correct=False):
+class SubQuestion:
+    def __init__(
+        self,
+        id=None,
+        question_id=None,
+        text="",  # The sub-question text
+        instructions="",  # Instructions for answering
+        correct_answer="",  # Expected answer
+        answer_type="number",  # Type of answer expected (number, time, etc)
+        min_value=None,  # For numeric answers: minimum allowed value
+        max_value=None,  # For numeric answers: maximum allowed value
+        time_format=None,  # For time answers: format specification
+        difficulty_level=1,  # Difficulty level 1-5
+        points=1,  # Points awarded for correct answer
+        hint=None,  # Optional hint for the student
+    ):
         self.id = id
         self.question_id = question_id
         self.text = text
-        self.is_correct = is_correct
+        self.instructions = instructions
+        self.correct_answer = correct_answer
+        self.answer_type = answer_type
+        self.min_value = min_value
+        self.max_value = max_value
+        self.time_format = time_format
+        self.difficulty_level = difficulty_level
+        self.points = points
+        self.hint = hint
         self.created = datetime.utcnow()
         self.modified = datetime.utcnow()
 
     @staticmethod
     def get_by_question(question_id):
-        choices = db.collection("choices").where("question_id", "==", question_id).get()
-        return [Choice.from_doc(doc) for doc in choices]
+        subquestions = (
+            db.collection("sub_questions").where("question_id", "==", question_id).get()
+        )
+        return [SubQuestion.from_doc(doc) for doc in subquestions]
 
     @staticmethod
     def from_doc(doc):
         data = doc.to_dict()
-        choice = Choice(
+        subq = SubQuestion(
             id=doc.id,
             question_id=data.get("question_id"),
             text=data.get("text", ""),
-            is_correct=data.get("is_correct", False),
+            instructions=data.get("instructions", ""),
+            correct_answer=data.get("correct_answer", ""),
+            answer_type=data.get("answer_type", "number"),
+            min_value=data.get("min_value"),
+            max_value=data.get("max_value"),
+            time_format=data.get("time_format"),
+            difficulty_level=data.get("difficulty_level", 1),
+            points=data.get("points", 1),
+            hint=data.get("hint"),
         )
-        choice.created = data.get("created", datetime.utcnow())
-        choice.modified = data.get("modified", datetime.utcnow())
-        return choice
+        subq.created = data.get("created", datetime.utcnow())
+        subq.modified = data.get("modified", datetime.utcnow())
+        return subq
 
     def save(self):
         data = {
             "question_id": self.question_id,
             "text": self.text,
-            "is_correct": self.is_correct,
+            "instructions": self.instructions,
+            "correct_answer": self.correct_answer,
+            "answer_type": self.answer_type,
+            "min_value": self.min_value,
+            "max_value": self.max_value,
+            "time_format": self.time_format,
+            "difficulty_level": self.difficulty_level,
+            "points": self.points,
+            "hint": self.hint,
             "created": self.created,
             "modified": self.modified,
         }
         if self.id:
-            db.collection("choices").document(self.id).set(data)
+            db.collection("sub_questions").document(self.id).set(data)
         else:
-            ref = db.collection("choices").add(data)
+            ref = db.collection("sub_questions").add(data)
             self.id = ref[1].id
-
-    @property
-    def html(self):
-        """Return the choice text as safe HTML"""
-        return self.text
 
 
 class AttemptedQuestion:
-    def __init__(self, user_id, question_id, selected_choice_id=None, is_correct=False):
+    def __init__(
+        self, user_id, question_id, sub_question_id=None, is_correct=False, images=None
+    ):
+        self.id = str(uuid.uuid4())
         self.user_id = user_id
         self.question_id = question_id
-        self.selected_choice_id = selected_choice_id
+        self.sub_question_id = sub_question_id
         self.is_correct = is_correct
+        self.images = images or {}
         self.attempted_at = datetime.utcnow()
 
     def save(self):
         data = {
             "user_id": self.user_id,
             "question_id": self.question_id,
-            "selected_choice_id": self.selected_choice_id,
+            "sub_question_id": self.sub_question_id,
             "is_correct": self.is_correct,
+            "images": self.images,
             "attempted_at": self.attempted_at,
         }
-        db.collection("attempted_questions").add(data)
+        db.collection("attempted_questions").document(self.id).set(data)

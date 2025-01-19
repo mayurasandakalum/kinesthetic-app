@@ -3,7 +3,13 @@ from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from firebase_admin import firestore
 
-from .models import User, QuizProfile, Question, AttemptedQuestion, Choice
+from .models import (
+    User,
+    QuizProfile,
+    Question,
+    AttemptedQuestion,
+    SubQuestion,
+)  # Update import
 from .forms import UserLoginForm, RegistrationForm, QuizForm
 
 db = firestore.client()
@@ -45,49 +51,57 @@ def leaderboard():
 @quiz_blueprint.route("/play", methods=["GET", "POST"])
 @login_required
 def play():
+    if request.method == "POST":
+        question_id = request.form.get("question_pk")
+        answer_method = request.form.get("answer_method")
+        sub_question_id = request.form.get("sub_question_id")
+
+        # Get all the captured images
+        captured_images = {}
+        for key in request.form:
+            if key.startswith("captured_image_webcam"):
+                captured_images[key] = request.form[key]
+
+        # Get the sub-question to check correct answer
+        sub_question_ref = (
+            db.collection("sub_questions").document(sub_question_id).get()
+        )
+        if sub_question_ref.exists:
+            sub_question_data = sub_question_ref.to_dict()
+            correct_answer = sub_question_data.get("correct_answer")
+            points = sub_question_data.get("points", 1)
+
+            # TODO: Implement image processing logic here
+            # is_correct = process_answer(answer_method, captured_images, correct_answer)
+            is_correct = True  # Temporary, replace with actual logic
+
+            # Save attempt
+            attempted = AttemptedQuestion(
+                user_id=current_user.id,
+                question_id=question_id,
+                sub_question_id=sub_question_id,
+                is_correct=is_correct,
+                images=captured_images,
+            )
+            attempted.save()
+
+            # Update score if correct
+            if is_correct:
+                quiz_profile = QuizProfile.get_by_user_id(current_user.id)
+                if quiz_profile:
+                    quiz_profile.total_score += points
+                    quiz_profile.save()
+
+        return redirect(url_for("quiz.play"))
+
+    # Get a new question
     quiz_profile = QuizProfile.get_by_user_id(current_user.id)
     if not quiz_profile:
         quiz_profile = QuizProfile(user_id=current_user.id)
         quiz_profile.save()
 
-    if request.method == "POST":
-        question_id = request.form.get("question_pk")
-        choice_id = request.form.get("choice_pk")
-
-        # Get the selected choice and check if it's correct
-        choices = db.collection("choices").where("question_id", "==", question_id).get()
-        selected_choice = None
-        is_correct = False
-
-        for choice in choices:
-            if choice.id == choice_id:
-                selected_choice = choice.to_dict()
-                is_correct = selected_choice.get("is_correct", False)
-                break
-
-        # Save the attempt
-        attempted = AttemptedQuestion(
-            user_id=current_user.id,
-            question_id=question_id,
-            selected_choice_id=choice_id,
-            is_correct=is_correct,
-        )
-        attempted.save()
-
-        # Update user's score if answer is correct
-        if is_correct:
-            quiz_profile.total_score += 1
-            quiz_profile.save()
-
-        return redirect(url_for("quiz.play"))
-
-    # Get a new question
     question = quiz_profile.get_new_question()
-    if question:
-        choices = Choice.get_by_question(question.id)
-        return render_template("quiz/play.html", question=question, choices=choices)
-
-    return render_template("quiz/play.html", question=None)
+    return render_template("quiz/play.html", question=question)
 
 
 @quiz_blueprint.route("/submission-result/<int:attempted_question_pk>")

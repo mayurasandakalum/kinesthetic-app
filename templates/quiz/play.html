@@ -4,161 +4,110 @@
 {% if question is none %}
 <div class="container">
   <div class="jumbotron my-4">
-    <h1>You have completed all available questions!</h1>
-    <p>Check the leaderboard to see how you rank against others.</p>
-    <a href="{{ url_for('quiz.leaderboard') }}" class="btn btn-primary">View Leaderboard</a>
+    <h1>පුහුණුව අවසන්!</h1>
+    <p>ඔබ සියලුම ප්‍රශ්න සම්පූර්ණ කර ඇත.</p>
+    <a href="{{ url_for('quiz.leaderboard') }}" class="btn btn-primary">ප්‍රතිඵල බලන්න</a>
   </div>
 </div>
 {% else %}
 <div class="container">
   <div class="jumbotron my-4">
-    <!-- Display question HTML safely -->
+    <!-- Main question with HTML content -->
     {{ question.text|safe }}
 
-    <form method="POST" action="{{ url_for('quiz.play') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="question_pk" value="{{ question.id }}">
+    <!-- Sub questions in accordion -->
+    <div class="accordion mt-4" id="subQuestionsAccordion">
+      {% for sub_q in question.sub_questions %}
+      <div class="card">
+        <div class="card-header" id="heading{{ loop.index }}">
+          <h2 class="mb-0">
+            <button class="btn btn-link w-100 text-start d-flex justify-content-between align-items-center"
+              type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}">
+              <span>{{ sub_q.text }}</span>
+              <span>
+                <span class="badge bg-primary me-2">ලකුණු {{ sub_q.points }}</span>
+                <span class="badge bg-secondary">මට්ටම {{ sub_q.difficulty_level }}</span>
+              </span>
+            </button>
+          </h2>
+        </div>
 
-      {% for choice in choices %}
-      <div class="form-check my-3">
-        <input class="form-check-input" type="radio" name="choice_pk" id="choice{{ loop.index }}"
-          value="{{ choice.id }}" required>
-        <label class="form-check-label" for="choice{{ loop.index }}">
-          {{ choice.text|safe }}
-        </label>
-      </div>
-      {% endfor %}
+        <div id="collapse{{ loop.index }}" class="collapse" data-bs-parent="#subQuestionsAccordion">
+          <div class="card-body">
+            <form method="POST" action="{{ url_for('quiz.play') }}" class="answer-form" enctype="multipart/form-data">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="question_pk" value="{{ question.id }}">
+              <input type="hidden" name="answer_method" value="{{ question.answer_method }}">
+              <input type="hidden" name="sub_question_id" value="{{ sub_q.id }}">
 
-      <!-- Beautiful Answer Button -->
-      <button type="button" class="btn btn-lg mt-4 px-5 py-3" style="background: linear-gradient(45deg, #FF6B6B, #4ECDC4); 
-                     color: white; 
-                     border-radius: 25px;
-                     font-size: 1.5rem;
-                     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-                     transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'"
-        onmouseout="this.style.transform='scale(1)'" data-bs-toggle="modal" data-bs-target="#answerModal">
-        <i class="fas fa-star me-2"></i> පිලිතුරු සපයන්න
-      </button>
+              <!-- Instructions -->
+              {% if sub_q.instructions %}
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> {{ sub_q.instructions }}
+              </div>
+              {% endif %}
 
-      <!-- Modified Modal -->
-      <div class="modal fade" id="answerModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-          <div class="modal-content" style="border-radius: 20px; background: linear-gradient(135deg, #fff, #f8f9fa);">
-            <div class="modal-header border-0">
-              <h5 class="modal-title" style="color: #2C3E50;">ඔබේ පිළිතුර ලබා දෙන්න</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <div class="row g-4">
-                <!-- First Answer Box -->
-                <div class="col-md-6">
-                  <div class="answer-box p-4 text-center"
-                    style="border: 3px solid #4ECDC4; border-radius: 15px; cursor: pointer;"
-                    onclick="startWebcam('webcam1')">
-                    <i class="fas fa-camera-retro fa-3x mb-3" style="color: #4ECDC4;"></i>
-                    <h5>පළමු පිළිතුර</h5>
-                    <div id="webcam1Container" class="mt-3" style="display: none;">
-                      <video id="webcam1" autoplay playsinline style="width: 100%; border-radius: 10px;"></video>
-                      <button type="button" class="btn btn-primary mt-2" onclick="captureImage('webcam1')">
-                        <i class="fas fa-camera me-2"></i>Capture
-                      </button>
-                    </div>
-                  </div>
+              <!-- Answer interface based on method -->
+              <div class="answer-interface p-4 text-center">
+                <!-- Method-specific instructions -->
+                <h5>
+                  {% if question.answer_method == 'abacus' %}
+                  අබැකස් උපකරණය පෙන්වන්න
+                  {% elif question.answer_method == 'analog_clock' %}
+                  අනලොග් ඔරලෝසුව පෙන්වන්න
+                  {% else %}
+                  ඩිජිටල් ඔරලෝසුව පෙන්වන්න
+                  {% endif %}
+                </h5>
+
+                <!-- Answer constraints -->
+                {% if sub_q.answer_type == 'number' and sub_q.min_value and sub_q.max_value %}
+                <p class="text-muted">අගය {{ sub_q.min_value }} සහ {{ sub_q.max_value }} අතර විය යුතුය</p>
+                {% endif %}
+                {% if sub_q.answer_type == 'time' and sub_q.time_format %}
+                <p class="text-muted">වේලාව {{ sub_q.time_format }} ආකෘතියට පෙන්වන්න</p>
+                {% endif %}
+
+                <!-- Webcam capture -->
+                <div id="webcam{{ loop.index }}Container" class="mt-3">
+                  <video id="webcam{{ loop.index }}" autoplay playsinline class="w-100 rounded"></video>
+                  <button type="button" class="btn btn-primary mt-2" onclick="captureImage('webcam{{ loop.index }}')">
+                    <i class="fas fa-camera me-2"></i>Capture
+                  </button>
                 </div>
 
-                <!-- Second Answer Box -->
-                <div class="col-md-6">
-                  <div class="answer-box p-4 text-center"
-                    style="border: 3px solid #FF6B6B; border-radius: 15px; cursor: pointer;"
-                    onclick="startWebcam('webcam2')">
-                    <i class="fas fa-camera-retro fa-3x mb-3" style="color: #FF6B6B;"></i>
-                    <h5>දෙවන පිළිතුර</h5>
-                    <div id="webcam2Container" class="mt-3" style="display: none;">
-                      <video id="webcam2" autoplay playsinline style="width: 100%; border-radius: 10px;"></video>
-                      <button type="button" class="btn btn-primary mt-2" onclick="captureImage('webcam2')">
-                        <i class="fas fa-camera me-2"></i>Capture
-                      </button>
-                    </div>
+                <!-- Submit button -->
+                <button type="submit" class="btn btn-success mt-3">
+                  <i class="fas fa-paper-plane me-2"></i>පිළිතුර යවන්න
+                </button>
+              </div>
+
+              <!-- Hint section -->
+              {% if sub_q.hint %}
+              <div class="hint-section mt-3">
+                <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="collapse"
+                  data-bs-target="#hint{{ loop.index }}">
+                  <i class="fas fa-lightbulb me-1"></i>උදව්වක් ලබා ගන්න
+                </button>
+                <div class="collapse mt-2" id="hint{{ loop.index }}">
+                  <div class="card card-body">
+                    {{ sub_q.hint }}
                   </div>
                 </div>
               </div>
-            </div>
-            <div class="modal-footer border-0 justify-content-center">
-              <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal" style="border-radius: 20px;">
-                ආපසු යන්න
-              </button>
-              <button type="submit" class="btn btn-primary px-4" style="background: linear-gradient(45deg, #4ECDC4, #45B7AF);
-                             border: none;
-                             border-radius: 20px;
-                             box-shadow: 0 2px 10px rgba(78,205,196,0.3);">
-                පිළිතුර යවන්න
-              </button>
-            </div>
+              {% endif %}
+            </form>
           </div>
         </div>
       </div>
-
-      <!-- Add JavaScript for webcam handling -->
-      <script>
-        let activeStream = null;
-
-        async function startWebcam(webcamId) {
-          try {
-            // Stop any existing stream
-            if (activeStream) {
-              activeStream.getTracks().forEach(track => track.stop());
-            }
-
-            // Hide all webcam containers first
-            document.getElementById('webcam1Container').style.display = 'none';
-            document.getElementById('webcam2Container').style.display = 'none';
-
-            // Start new stream
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            activeStream = stream;
-            const video = document.getElementById(webcamId);
-            video.srcObject = stream;
-            document.getElementById(`${webcamId}Container`).style.display = 'block';
-          } catch (err) {
-            console.error('Error accessing webcam:', err);
-            alert('කැමරාව භාවිතා කිරීමට නොහැකි විය. කරුණාකර අවසර ලබා දෙන්න.');
-          }
-        }
-
-        async function captureImage(webcamId) {
-          const video = document.getElementById(webcamId);
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          canvas.getContext('2d').drawImage(video, 0, 0);
-
-          // Convert to base64 and store in hidden input
-          const imageData = canvas.toDataURL('image/jpeg');
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = `captured_image_${webcamId}`;
-          input.value = imageData;
-          document.querySelector('form').appendChild(input);
-
-          // Stop the stream after capture
-          if (activeStream) {
-            activeStream.getTracks().forEach(track => track.stop());
-          }
-          document.getElementById(`${webcamId}Container`).style.display = 'none';
-        }
-
-        // Clean up when modal is closed
-        document.getElementById('answerModal').addEventListener('hidden.bs.modal', function () {
-          if (activeStream) {
-            activeStream.getTracks().forEach(track => track.stop());
-          }
-          document.getElementById('webcam1Container').style.display = 'none';
-          document.getElementById('webcam2Container').style.display = 'none';
-        });
-      </script>
-
-    </form>
+      {% endfor %}
+    </div>
   </div>
 </div>
+
+<!-- Webcam handling script -->
+<script>
+  // ...existing webcam JavaScript code...
+</script>
 {% endif %}
 {% endblock %}
