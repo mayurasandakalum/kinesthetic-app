@@ -10,6 +10,8 @@ from wtforms import (
     TextAreaField,
     IntegerField,
     FloatField,
+    FieldList,
+    FormField,
 )
 from wtforms.validators import DataRequired, Email, EqualTo, Optional, NumberRange
 
@@ -36,19 +38,6 @@ class QuizForm(FlaskForm):
     choice_pk = RadioField("Choice", validators=[DataRequired()])
 
 
-class QuestionForm(FlaskForm):
-    text = TextAreaField("Main Question Text", validators=[DataRequired()])
-    answer_method = SelectField(
-        "Answer Method", choices=[], validators=[DataRequired()]
-    )
-    is_published = BooleanField("Published")
-    submit = SubmitField("Save Question")
-
-    def __init__(self, *args, **kwargs):
-        super(QuestionForm, self).__init__(*args, **kwargs)
-        self.answer_method.choices = AnswerMethod.CHOICES
-
-
 class SubQuestionForm(FlaskForm):
     text = TextAreaField("Sub-Question Text", validators=[DataRequired()])
     instructions = TextAreaField("Instructions")
@@ -67,3 +56,22 @@ class SubQuestionForm(FlaskForm):
     points = IntegerField("Points", validators=[NumberRange(min=1)], default=1)
     hint = TextAreaField("Hint")
     submit = SubmitField("Save Sub-Question")
+
+    class Meta:
+        csrf = False  # Disable CSRF for nested form
+
+
+class QuestionForm(FlaskForm):
+    text = TextAreaField("Question Text", validators=[DataRequired()])
+    answer_method = SelectField(
+        "Answer Method",
+        choices=[
+            ("abacus", "Abacus"),
+            ("analog_clock", "Analog Clock"),
+            ("digital_clock", "Digital Clock"),
+        ],
+        validators=[DataRequired()],
+    )
+    is_published = BooleanField("Published")
+    sub_questions = FieldList(FormField(SubQuestionForm), min_entries=1)
+    submit = SubmitField("Save Question")

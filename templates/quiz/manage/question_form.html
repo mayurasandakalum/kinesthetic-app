@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('quiz.manage_questions') }}">Question Bank</a></li>
+            <li class="breadcrumb-item active">{{ title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h3 class="card-title mb-4">{{ title }}</h3>
+                    <form method="POST" id="questionForm">
+                        {{ form.hidden_tag() }}
+
+                        <!-- Main Question -->
+                        <div class="mb-4">
+                            {{ form.text.label(class="form-label fw-bold") }}
+                            <div class="form-text mb-2">Enter the main question text. HTML formatting is supported.
+                            </div>
+                            {{ form.text(class="form-control", rows=5) }}
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                {{ form.answer_method.label(class="form-label fw-bold") }}
+                                <div class="form-text mb-2">Select how students will answer this question.</div>
+                                {{ form.answer_method(class="form-select") }}
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mt-4">
+                                    {{ form.is_published(class="form-check-input") }}
+                                    {{ form.is_published.label(class="form-check-label") }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub Questions -->
+                        <div class="card bg-light border-0 mb-4">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-4">
+                                    <h5 class="card-title mb-0">
+                                        <i class="bi bi-list-nested me-2"></i>Sub-questions
+                                    </h5>
+                                    <button type="button" class="btn btn-success btn-sm" id="addSubQuestion">
+                                        <i class="bi bi-plus-lg me-1"></i>Add Sub-question
+                                    </button>
+                                </div>
+
+                                <div id="subQuestionsContainer">
+                                    {% for subform in form.sub_questions %}
+                                    <div class="sub-question-form mb-4 border rounded p-4 position-relative">
+                                        <button type="button"
+                                            class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2 remove-subquestion">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+
+                                        <div class="mb-3">
+                                            {{ subform.text.label(class="form-label fw-bold") }}
+                                            {{ subform.text(class="form-control", rows=2) }}
+                                        </div>
+
+                                        <div class="mb-3">
+                                            {{ subform.instructions.label(class="form-label fw-bold") }}
+                                            {{ subform.instructions(class="form-control", rows=2) }}
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                {{ subform.correct_answer.label(class="form-label fw-bold") }}
+                                                {{ subform.correct_answer(class="form-control") }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ subform.answer_type.label(class="form-label fw-bold") }}
+                                                {{ subform.answer_type(class="form-select") }}
+                                            </div>
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <div class="col-md-4">
+                                                {{ subform.min_value.label(class="form-label") }}
+                                                {{ subform.min_value(class="form-control") }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                {{ subform.max_value.label(class="form-label") }}
+                                                {{ subform.max_value(class="form-control") }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                {{ subform.time_format.label(class="form-label") }}
+                                                {{ subform.time_format(class="form-control") }}
+                                            </div>
+                                        </div>
+
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                {{ subform.difficulty_level.label(class="form-label") }}
+                                                {{ subform.difficulty_level(class="form-control") }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ subform.points.label(class="form-label") }}
+                                                {{ subform.points(class="form-control") }}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            {{ subform.hint.label(class="form-label fw-bold") }}
+                                            {{ subform.hint(class="form-control") }}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            {{ form.submit(class="btn btn-primary") }}
+                            <a href="{{ url_for('quiz.manage_questions') }}"
+                                class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="subQuestionTemplate">
+    <!-- Copy of the sub-question form structure -->
+    <!-- This will be used by JavaScript to add new sub-questions -->
+</template>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const container = document.getElementById('subQuestionsContainer');
+        const addButton = document.getElementById('addSubQuestion');
+        const template = document.getElementById('subQuestionTemplate');
+
+        // Add new sub-question
+        addButton.addEventListener('click', function () {
+            const index = container.children.length;
+            const clone = template.content.cloneNode(true);
+
+            // Update all form field names with new index
+            clone.querySelectorAll('[name]').forEach(field => {
+                field.name = field.name.replace('0', index.toString());
+            });
+
+            container.appendChild(clone);
+        });
+
+        // Remove sub-question
+        container.addEventListener('click', function (e) {
+            if (e.target.closest('.remove-subquestion')) {
+                const subQuestion = e.target.closest('.sub-question-form');
+                if (container.children.length > 1) {
+                    subQuestion.remove();
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -9,8 +9,14 @@ from .models import (
     Question,
     AttemptedQuestion,
     SubQuestion,
-)  # Update import
-from .forms import UserLoginForm, RegistrationForm, QuizForm
+)
+from .forms import (
+    UserLoginForm,
+    RegistrationForm,
+    QuizForm,
+    QuestionForm,
+    SubQuestionForm,
+)  # Added QuestionForm and SubQuestionForm
 
 db = firestore.client()
 
@@ -166,3 +172,146 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for("quiz.home"))
+
+
+@quiz_blueprint.route("/manage/questions")
+@login_required
+def manage_questions():
+    questions_ref = (
+        db.collection("questions")
+        .order_by("created", direction=firestore.Query.DESCENDING)
+        .get()
+    )
+    questions = [Question.from_doc(q) for q in questions_ref]
+    return render_template("quiz/manage/questions_list.html", questions=questions)
+
+
+@quiz_blueprint.route("/manage/questions/new", methods=["GET", "POST"])
+@login_required
+def new_question():
+    form = QuestionForm()
+    if form.validate_on_submit():
+        # Create the main question
+        question = Question(
+            text=form.text.data,
+            answer_method=form.answer_method.data,
+            is_published=form.is_published.data,
+        )
+        question.save()
+
+        # Create sub-questions
+        for sub_form in form.sub_questions:
+            subquestion = SubQuestion(
+                question_id=question.id,
+                text=sub_form.text.data,
+                instructions=sub_form.instructions.data,
+                correct_answer=sub_form.correct_answer.data,
+                answer_type=sub_form.answer_type.data,
+                min_value=sub_form.min_value.data,
+                max_value=sub_form.max_value.data,
+                time_format=sub_form.time_format.data,
+                difficulty_level=sub_form.difficulty_level.data,
+                points=sub_form.points.data,
+                hint=sub_form.hint.data,
+            )
+            subquestion.save()
+
+        flash("Question and sub-questions created successfully!", "success")
+        return redirect(url_for("quiz.manage_questions"))
+    return render_template(
+        "quiz/manage/question_form.html", form=form, title="New Question"
+    )
+
+
+@quiz_blueprint.route("/manage/questions/<question_id>", methods=["GET", "POST"])
+@login_required
+def edit_question(question_id):
+    question_ref = db.collection("questions").document(question_id).get()
+    if not question_ref.exists:
+        flash("Question not found!", "error")
+        return redirect(url_for("quiz.manage_questions"))
+
+    question = Question.from_doc(question_ref)
+    form = QuestionForm(obj=question)
+
+    if form.validate_on_submit():
+        question.text = form.text.data
+        question.answer_method = form.answer_method.data
+        question.is_published = form.is_published.data
+        question.save()
+        flash("Question updated successfully!", "success")
+        return redirect(url_for("quiz.manage_questions"))
+
+    return render_template(
+        "quiz/manage/question_form.html",
+        form=form,
+        question=question,
+        title="Edit Question",
+    )
+
+
+@quiz_blueprint.route(
+    "/manage/questions/<question_id>/subquestions/new", methods=["GET", "POST"]
+)
+@login_required
+def new_subquestion(question_id):
+    form = SubQuestionForm()
+    if form.validate_on_submit():
+        subquestion = SubQuestion(
+            question_id=question_id,
+            text=form.text.data,
+            instructions=form.instructions.data,
+            correct_answer=form.correct_answer.data,
+            answer_type=form.answer_type.data,
+            min_value=form.min_value.data,
+            max_value=form.max_value.data,
+            time_format=form.time_format.data,
+            difficulty_level=form.difficulty_level.data,
+            points=form.points.data,
+            hint=form.hint.data,
+        )
+        subquestion.save()
+        flash("Sub-question added successfully!", "success")
+        return redirect(url_for("quiz.edit_question", question_id=question_id))
+    return render_template(
+        "quiz/manage/subquestion_form.html",
+        form=form,
+        question_id=question_id,
+        title="New Sub-question",
+    )
+
+
+@quiz_blueprint.route("/manage/subquestions/<subquestion_id>", methods=["GET", "POST"])
+@login_required
+def edit_subquestion(subquestion_id):
+    subquestion_ref = db.collection("sub_questions").document(subquestion_id).get()
+    if not subquestion_ref.exists:
+        flash("Sub-question not found!", "error")
+        return redirect(url_for("quiz.manage_questions"))
+
+    subquestion = SubQuestion.from_doc(subquestion_ref)
+    form = SubQuestionForm(obj=subquestion)
+
+    if form.validate_on_submit():
+        subquestion.text = form.text.data
+        subquestion.instructions = form.instructions.data
+        subquestion.correct_answer = form.correct_answer.data
+        subquestion.answer_type = form.answer_type.data
+        subquestion.min_value = form.min_value.data
+        subquestion.max_value = form.max_value.data
+        subquestion.time_format = form.time_format.data
+        subquestion.difficulty_level = form.difficulty_level.data
+        subquestion.points = form.points.data
+        subquestion.hint = form.hint.data
+        subquestion.save()
+        flash("Sub-question updated successfully!", "success")
+        return redirect(
+            url_for("quiz.edit_question", question_id=subquestion.question_id)
+        )
+
+    return render_template(
+        "quiz/manage/subquestion_form.html",
+        form=form,
+        subquestion=subquestion,
+        title="Edit Sub-question",
+    )
