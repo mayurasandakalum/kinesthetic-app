@@ -129,8 +129,75 @@
 </div>
 
 <template id="subQuestionTemplate">
-    <!-- Copy of the sub-question form structure -->
-    <!-- This will be used by JavaScript to add new sub-questions -->
+    <div class="sub-question-form mb-4 border rounded p-4 position-relative">
+        <button type="button"
+            class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2 remove-subquestion">
+            <i class="bi bi-x-lg"></i>
+        </button>
+
+        <!-- Text -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">Sub-Question Text</label>
+            <textarea name="sub_questions-{index}-text" class="form-control" rows="2" required></textarea>
+        </div>
+
+        <!-- Instructions -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">Instructions</label>
+            <textarea name="sub_questions-{index}-instructions" class="form-control" rows="2"></textarea>
+        </div>
+
+        <!-- Answer Details -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Correct Answer</label>
+                <input type="text" name="sub_questions-{index}-correct_answer" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Answer Type</label>
+                <select name="sub_questions-{index}-answer_type" class="form-select" required>
+                    <option value="number">Number</option>
+                    <option value="time">Time</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Answer Constraints -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">Minimum Value</label>
+                <input type="number" step="any" name="sub_questions-{index}-min_value" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Maximum Value</label>
+                <input type="number" step="any" name="sub_questions-{index}-max_value" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Time Format</label>
+                <input type="text" name="sub_questions-{index}-time_format" class="form-control">
+            </div>
+        </div>
+
+        <!-- Difficulty and Points -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Difficulty Level</label>
+                <input type="number" name="sub_questions-{index}-difficulty_level" class="form-control" value="1"
+                    min="1" max="5" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Points</label>
+                <input type="number" name="sub_questions-{index}-points" class="form-control" value="1" min="1"
+                    required>
+            </div>
+        </div>
+
+        <!-- Hint -->
+        <div>
+            <label class="form-label fw-bold">Hint</label>
+            <textarea name="sub_questions-{index}-hint" class="form-control"></textarea>
+        </div>
+    </div>
 </template>
 
 <script>
@@ -142,14 +209,14 @@
         // Add new sub-question
         addButton.addEventListener('click', function () {
             const index = container.children.length;
-            const clone = template.content.cloneNode(true);
-
-            // Update all form field names with new index
-            clone.querySelectorAll('[name]').forEach(field => {
-                field.name = field.name.replace('0', index.toString());
-            });
-
-            container.appendChild(clone);
+            // Get template content and replace index placeholders
+            const templateHtml = template.innerHTML.replace(/{index}/g, index);
+            // Create temporary container and set its HTML
+            const temp = document.createElement('div');
+            temp.innerHTML = templateHtml;
+            // Get the first child (our actual template content)
+            const newSubQuestion = temp.firstElementChild;
+            container.appendChild(newSubQuestion);
         });
 
         // Remove sub-question
@@ -158,6 +225,12 @@
                 const subQuestion = e.target.closest('.sub-question-form');
                 if (container.children.length > 1) {
                     subQuestion.remove();
+                    // Reindex remaining sub-questions
+                    Array.from(container.children).forEach((subQ, idx) => {
+                        subQ.querySelectorAll('[name]').forEach(input => {
+                            input.name = input.name.replace(/\d+/, idx);
+                        });
+                    });
                 }
             }
         });
