@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from firebase_admin import firestore
@@ -9,6 +9,7 @@ from .models import (
     Question,
     AttemptedQuestion,
     SubQuestion,
+    Subject,
 )
 from .forms import (
     UserLoginForm,
@@ -177,23 +178,37 @@ def logout():
 @quiz_blueprint.route("/manage/questions")
 @login_required
 def manage_questions():
+    questions_by_subject = {}
     questions_ref = (
         db.collection("questions")
         .order_by("created", direction=firestore.Query.DESCENDING)
         .get()
     )
-    questions = [Question.from_doc(q) for q in questions_ref]
-    return render_template("quiz/manage/questions_list.html", questions=questions)
+
+    for doc in questions_ref:
+        question = Question.from_doc(doc)
+        if question.subject not in questions_by_subject:
+            questions_by_subject[question.subject] = []
+        questions_by_subject[question.subject].append(question)
+
+    return render_template(
+        "quiz/manage/questions_list.html",
+        questions_by_subject=questions_by_subject,
+        subjects=Subject.CHOICES,
+    )
 
 
 @quiz_blueprint.route("/manage/questions/new", methods=["GET", "POST"])
 @login_required
 def new_question():
-    form = QuestionForm()
+    # Get subject from query parameter if it exists
+    subject = request.args.get("subject", Subject.ADDITION)
+    form = QuestionForm(initial_subject=subject)
+
     if form.validate_on_submit():
-        # Create the main question
         question = Question(
             text=form.text.data,
+            subject=form.subject.data,  # Make sure to save the subject
             answer_method=form.answer_method.data,
             is_published=form.is_published.data,
         )
@@ -219,7 +234,10 @@ def new_question():
         flash("Question and sub-questions created successfully!", "success")
         return redirect(url_for("quiz.manage_questions"))
     return render_template(
-        "quiz/manage/question_form.html", form=form, title="New Question"
+        "quiz/manage/question_form.html",
+        form=form,
+        title="New Question",
+        initial_subject=subject,
     )
 
 
@@ -315,3 +333,11 @@ def edit_subquestion(subquestion_id):
         subquestion=subquestion,
         title="Edit Sub-question",
     )
+
+
+@quiz_blueprint.route("/api/answer-methods/<subject>")
+@login_required
+def get_answer_methods(subject):
+    # Get the answer methods for the selected subject
+    methods = Subject.ANSWER_METHODS.get(subject, [])
+    return jsonify({"methods": methods})

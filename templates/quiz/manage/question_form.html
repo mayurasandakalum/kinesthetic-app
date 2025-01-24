@@ -306,6 +306,65 @@
         // Update on add/remove
         const observer = new MutationObserver(updateNoSubQuestionsMessage);
         observer.observe(container, { childList: true });
+
+        // Add subject change handler
+        const subjectSelect = document.querySelector('[name="subject"]');
+        const answerMethodSelect = document.querySelector('[name="answer_method"]');
+
+        if (subjectSelect && answerMethodSelect) {
+            // Function to update answer methods
+            const updateAnswerMethods = () => {
+                fetch(`/api/answer-methods/${subjectSelect.value}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        answerMethodSelect.innerHTML = data.methods
+                            .map(([value, label]) =>
+                                `<option value="${value}">${label}</option>`
+                            ).join('');
+                    });
+            };
+
+            // Update on change
+            subjectSelect.addEventListener('change', updateAnswerMethods);
+
+            // Update initially if subject is already selected
+            if (subjectSelect.value) {
+                updateAnswerMethods();
+            }
+        }
+    });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const subjectSelect = document.querySelector('[name="subject"]');
+        const answerMethodSelect = document.querySelector('[name="answer_method"]');
+
+        if (subjectSelect && answerMethodSelect) {
+            const updateAnswerMethods = () => {
+                fetch(`/api/answer-methods/${subjectSelect.value}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Clear existing options
+                        answerMethodSelect.innerHTML = '';
+                        // Add new options from the API
+                        data.methods.forEach(([value, label]) => {
+                            const option = new Option(label, value);
+                            answerMethodSelect.add(option);
+                        });
+                        // Trigger change event to update any dependent fields
+                        answerMethodSelect.dispatchEvent(new Event('change'));
+                    });
+            };
+
+            // Update answer methods when subject changes
+            subjectSelect.addEventListener('change', updateAnswerMethods);
+
+            // Initial update if subject is already selected
+            if (subjectSelect.value) {
+                updateAnswerMethods();
+            }
+        }
     });
 </script>
 

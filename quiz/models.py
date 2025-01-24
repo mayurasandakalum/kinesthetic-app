@@ -168,12 +168,39 @@ class AnswerMethod:
     ]
 
 
+class Subject:
+    ADDITION = "addition"
+    SUBTRACTION = "subtraction"
+    TIME = "time"
+
+    CHOICES = [
+        (ADDITION, "එකතු කිරීම පාඩම"),
+        (SUBTRACTION, "අඩු කිරීම පාඩම"),
+        (TIME, "කාලය පාඩම"),
+    ]
+
+    ANSWER_METHODS = {
+        ADDITION: [(AnswerMethod.ABACUS, "Abacus")],
+        SUBTRACTION: [(AnswerMethod.ABACUS, "Abacus")],
+        TIME: [
+            (AnswerMethod.ANALOG_CLOCK, "Analog Clock"),
+            (AnswerMethod.DIGITAL_CLOCK, "Digital Clock"),
+        ],
+    }
+
+
 class Question:
     def __init__(
-        self, id=None, text="", answer_method=AnswerMethod.ABACUS, is_published=False
+        self,
+        id=None,
+        text="",
+        subject=Subject.ADDITION,
+        answer_method=AnswerMethod.ABACUS,
+        is_published=False,
     ):
         self.id = id
-        self.text = text  # This will be the main question/description
+        self.text = text
+        self.subject = subject
         self.answer_method = answer_method
         self.is_published = is_published
         self.created = datetime.utcnow()
@@ -185,6 +212,7 @@ class Question:
         question = Question(
             id=doc.id,
             text=data.get("text", ""),
+            subject=data.get("subject", Subject.ADDITION),
             answer_method=data.get("answer_method", AnswerMethod.ABACUS),
             is_published=data.get("is_published", False),
         )
@@ -195,6 +223,7 @@ class Question:
     def save(self):
         data = {
             "text": self.text,
+            "subject": self.subject,
             "answer_method": self.answer_method,
             "is_published": self.is_published,
             "created": self.created,

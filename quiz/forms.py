@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask import request  # Add this import
 from wtforms import (
     StringField,
     PasswordField,
@@ -13,7 +14,15 @@ from wtforms import (
     FieldList,
     FormField,
 )
-from wtforms.validators import DataRequired, Email, EqualTo, Optional, NumberRange
+from wtforms.validators import (
+    DataRequired,
+    Email,
+    EqualTo,
+    Optional,
+    NumberRange,
+    ValidationError,
+)
+from .models import Subject  # Add this import
 
 
 class UserLoginForm(FlaskForm):
@@ -63,15 +72,36 @@ class SubQuestionForm(FlaskForm):
 
 class QuestionForm(FlaskForm):
     text = TextAreaField("Question Text", validators=[DataRequired()])
+    subject = SelectField(
+        "Subject",
+        choices=Subject.CHOICES,
+        validators=[DataRequired()],
+    )
     answer_method = SelectField(
         "Answer Method",
-        choices=[
-            ("abacus", "Abacus"),
-            ("analog_clock", "Analog Clock"),
-            ("digital_clock", "Digital Clock"),
-        ],
+        choices=[],  # Will be populated based on subject
         validators=[DataRequired()],
     )
     is_published = BooleanField("Published")
     sub_questions = FieldList(FormField(SubQuestionForm), min_entries=1)
     submit = SubmitField("Save Question")
+
+    def __init__(self, *args, **kwargs):
+        super(QuestionForm, self).__init__(*args, **kwargs)
+
+        # Set initial subject from kwargs or use ADDITION as default
+        if kwargs.get("obj"):
+            subject = kwargs["obj"].subject
+        else:
+            subject = kwargs.get("initial_subject", Subject.ADDITION)
+            self.subject.data = subject
+
+        # Set the answer method choices based on subject
+        self.answer_method.choices = Subject.ANSWER_METHODS.get(subject, [])
+
+    def validate_answer_method(self, field):
+        # Ensure the selected answer method is valid for the chosen subject
+        if field.data not in [
+            method[0] for method in Subject.ANSWER_METHODS.get(self.subject.data, [])
+        ]:
+            raise ValidationError("Invalid answer method for selected subject")
