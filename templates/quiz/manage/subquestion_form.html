@@ -20,6 +20,7 @@
                     <h3 class="card-title mb-4">{{ title }}</h3>
                     <form method="POST">
                         {{ form.hidden_tag() }}
+                        {{ form.csrf_token }} <!-- Add this line to include the CSRF token -->
 
                         <!-- Question Text -->
                         <div class="mb-4">
@@ -103,7 +104,7 @@
                         <!-- Form Actions -->
                         <div class="d-flex gap-2">
                             {{ form.submit(class="btn btn-primary px-4") }}
-                            <a href="{{ url_for('quiz.edit_question', question_id=request.view_args.get('question_id', subquestion.question_id if subquestion else None)) }}"
+                            <a href="{{ url_for('quiz.manage_questions') }}"
                                 class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>

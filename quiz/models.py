@@ -205,6 +205,7 @@ class Question:
         self.is_published = is_published
         self.created = datetime.utcnow()
         self.modified = datetime.utcnow()
+        self._sub_questions = None  # Cache for sub-questions
 
     @staticmethod
     def from_doc(doc):
@@ -247,7 +248,13 @@ class Question:
 
     @property
     def sub_questions(self):
-        return SubQuestion.get_by_question(self.id)
+        # Return cached sub-questions if available
+        if self._sub_questions is not None:
+            return self._sub_questions
+
+        # Otherwise load from database
+        self._sub_questions = SubQuestion.get_by_question(self.id)
+        return self._sub_questions
 
 
 class SubQuestion:
@@ -283,8 +290,12 @@ class SubQuestion:
 
     @staticmethod
     def get_by_question(question_id):
+        # Add index hint for better performance
         subquestions = (
-            db.collection("sub_questions").where("question_id", "==", question_id).get()
+            db.collection("sub_questions")
+            .where("question_id", "==", question_id)
+            .order_by("created", direction=firestore.Query.ASCENDING)
+            .get()
         )
         return [SubQuestion.from_doc(doc) for doc in subquestions]
 

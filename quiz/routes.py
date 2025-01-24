@@ -176,19 +176,40 @@ def logout():
 
 
 @quiz_blueprint.route("/manage/questions")
-@login_required
 def manage_questions():
-    questions_by_subject = {}
+    # Get all questions in a single query
     questions_ref = (
         db.collection("questions")
         .order_by("created", direction=firestore.Query.DESCENDING)
         .get()
     )
 
-    for doc in questions_ref:
-        question = Question.from_doc(doc)
+    # Get all sub-questions in a single batch
+    all_questions = [Question.from_doc(doc) for doc in questions_ref]
+    question_ids = [q.id for q in all_questions]
+
+    # Batch load all sub-questions
+    sub_questions_by_question = {}
+    if question_ids:
+        sub_questions_ref = (
+            db.collection("sub_questions")
+            .where("question_id", "in", question_ids)
+            .get()
+        )
+
+        # Group sub-questions by question_id
+        for sub_doc in sub_questions_ref:
+            sub_q = SubQuestion.from_doc(sub_doc)
+            if sub_q.question_id not in sub_questions_by_question:
+                sub_questions_by_question[sub_q.question_id] = []
+            sub_questions_by_question[sub_q.question_id].append(sub_q)
+
+    # Organize questions by subject
+    questions_by_subject = {}
+    for question in all_questions:
         if question.subject not in questions_by_subject:
             questions_by_subject[question.subject] = []
+        question._sub_questions = sub_questions_by_question.get(question.id, [])
         questions_by_subject[question.subject].append(question)
 
     return render_template(
@@ -199,7 +220,6 @@ def manage_questions():
 
 
 @quiz_blueprint.route("/manage/questions/new", methods=["GET", "POST"])
-@login_required
 def new_question():
     # Get subject from query parameter if it exists
     subject = request.args.get("subject", Subject.ADDITION)
@@ -242,7 +262,6 @@ def new_question():
 
 
 @quiz_blueprint.route("/manage/questions/<question_id>", methods=["GET", "POST"])
-@login_required
 def edit_question(question_id):
     question_ref = db.collection("questions").document(question_id).get()
     if not question_ref.exists:
@@ -280,7 +299,6 @@ def edit_question(question_id):
 @quiz_blueprint.route(
     "/manage/questions/<question_id>/subquestions/new", methods=["GET", "POST"]
 )
-@login_required
 def new_subquestion(question_id):
     form = SubQuestionForm()
     if form.validate_on_submit():
@@ -299,7 +317,7 @@ def new_subquestion(question_id):
         )
         subquestion.save()
         flash("Sub-question added successfully!", "success")
-        return redirect(url_for("quiz.edit_question", question_id=question_id))
+        return redirect(url_for("quiz.manage_questions"))  # Changed this line
     return render_template(
         "quiz/manage/subquestion_form.html",
         form=form,
@@ -309,7 +327,6 @@ def new_subquestion(question_id):
 
 
 @quiz_blueprint.route("/manage/subquestions/<subquestion_id>", methods=["GET", "POST"])
-@login_required
 def edit_subquestion(subquestion_id):
     subquestion_ref = db.collection("sub_questions").document(subquestion_id).get()
     if not subquestion_ref.exists:
@@ -332,9 +349,7 @@ def edit_subquestion(subquestion_id):
         subquestion.hint = form.hint.data
         subquestion.save()
         flash("Sub-question updated successfully!", "success")
-        return redirect(
-            url_for("quiz.edit_question", question_id=subquestion.question_id)
-        )
+        return redirect(url_for("quiz.manage_questions"))  # Changed this line
 
     return render_template(
         "quiz/manage/subquestion_form.html",

@@ -66,9 +66,6 @@ class SubQuestionForm(FlaskForm):
     hint = TextAreaField("Hint")
     submit = SubmitField("Save Sub-Question")
 
-    class Meta:
-        csrf = False  # Disable CSRF for nested form
-
 
 class QuestionForm(FlaskForm):
     text = TextAreaField("Question Text", validators=[DataRequired()])
