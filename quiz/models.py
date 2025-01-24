@@ -194,7 +194,7 @@ class Question:
         self,
         id=None,
         text="",
-        subject=Subject.ADDITION,
+        subject=Subject.ADDITION,  # Default subject
         answer_method=AnswerMethod.ABACUS,
         is_published=False,
     ):
@@ -209,10 +209,17 @@ class Question:
     @staticmethod
     def from_doc(doc):
         data = doc.to_dict()
+        # Ensure subject is always set, default to ADDITION if not present
+        subject = data.get("subject")
+        if not subject:
+            subject = Subject.ADDITION
+            # Update the document with the default subject
+            db.collection("questions").document(doc.id).update({"subject": subject})
+
         question = Question(
             id=doc.id,
             text=data.get("text", ""),
-            subject=data.get("subject", Subject.ADDITION),
+            subject=subject,
             answer_method=data.get("answer_method", AnswerMethod.ABACUS),
             is_published=data.get("is_published", False),
         )
@@ -226,14 +233,17 @@ class Question:
             "subject": self.subject,
             "answer_method": self.answer_method,
             "is_published": self.is_published,
-            "created": self.created,
-            "modified": self.modified,
+            "modified": datetime.utcnow(),
         }
-        if self.id:
-            db.collection("questions").document(self.id).set(data)
-        else:
+
+        if not self.id:
+            # New question
+            data["created"] = datetime.utcnow()
             ref = db.collection("questions").add(data)
             self.id = ref[1].id
+        else:
+            # Update existing question
+            db.collection("questions").document(self.id).update(data)
 
     @property
     def sub_questions(self):

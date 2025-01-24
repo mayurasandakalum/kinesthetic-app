@@ -32,16 +32,21 @@
                                 </div>
 
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
+                                        {{ form.subject.label(class="form-label fw-bold") }}
+                                        <div class="form-text mb-2">Select the subject for this question.</div>
+                                        {{ form.subject(class="form-select") }}
+                                    </div>
+                                    <div class="col-md-4">
                                         {{ form.answer_method.label(class="form-label fw-bold") }}
                                         <div class="form-text mb-2">Select how students will answer this question.</div>
                                         {{ form.answer_method(class="form-select") }}
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label class="form-label fw-bold">Status</label>
                                         <div class="form-text mb-2">Control whether this question is visible to
                                             students.</div>
-                                        <div class="form-check form-switch">
+                                        <div class="form-check form-switch mt-2">
                                             {{ form.is_published(class="form-check-input") }}
                                             {{ form.is_published.label(class="form-check-label") }}
                                         </div>

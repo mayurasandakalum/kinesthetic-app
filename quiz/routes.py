@@ -253,12 +253,21 @@ def edit_question(question_id):
     form = QuestionForm(obj=question)
 
     if form.validate_on_submit():
+        # Update question fields
         question.text = form.text.data
+        question.subject = form.subject.data
         question.answer_method = form.answer_method.data
         question.is_published = form.is_published.data
-        question.save()
-        flash("Question updated successfully!", "success")
-        return redirect(url_for("quiz.manage_questions"))
+        question.modified = datetime.utcnow()
+
+        try:
+            # Update the question in the database
+            question.save()
+            flash("Question updated successfully!", "success")
+            return redirect(url_for("quiz.manage_questions"))
+        except Exception as e:
+            flash(f"Error updating question: {str(e)}", "error")
+            return redirect(url_for("quiz.edit_question", question_id=question_id))
 
     return render_template(
         "quiz/manage/question_form.html",
