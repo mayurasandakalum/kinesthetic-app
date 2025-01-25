@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from firebase_admin import firestore
+from datetime import datetime  # Add this import at the top
 
 from .models import (
     User,
@@ -262,6 +263,7 @@ def new_question():
 
 
 @quiz_blueprint.route("/manage/questions/<question_id>", methods=["GET", "POST"])
+@login_required  # Keep this decorator here
 def edit_question(question_id):
     question_ref = db.collection("questions").document(question_id).get()
     if not question_ref.exists:
@@ -277,7 +279,7 @@ def edit_question(question_id):
         question.subject = form.subject.data
         question.answer_method = form.answer_method.data
         question.is_published = form.is_published.data
-        question.modified = datetime.utcnow()
+        question.modified = datetime.utcnow()  # Now datetime is properly imported
 
         try:
             # Update the question in the database
@@ -360,8 +362,7 @@ def edit_subquestion(subquestion_id):
 
 
 @quiz_blueprint.route("/api/answer-methods/<subject>")
-@login_required
-def get_answer_methods(subject):
+def get_answer_methods(subject):  # Remove @login_required decorator
     # Get the answer methods for the selected subject
     methods = Subject.ANSWER_METHODS.get(subject, [])
     return jsonify({"methods": methods})

@@ -348,7 +348,12 @@
         if (subjectSelect && answerMethodSelect) {
             const updateAnswerMethods = () => {
                 fetch(`/api/answer-methods/${subjectSelect.value}`)
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         // Clear existing options
                         answerMethodSelect.innerHTML = '';
@@ -359,6 +364,9 @@
                         });
                         // Trigger change event to update any dependent fields
                         answerMethodSelect.dispatchEvent(new Event('change'));
+                    })
+                    .catch(error => {
+                        console.error('Error fetching answer methods:', error);
                     });
             };
 
