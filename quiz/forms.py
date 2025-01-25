@@ -79,7 +79,7 @@ class QuestionForm(FlaskForm):
         choices=[],  # Will be populated based on subject
         validators=[DataRequired()],
     )
-    is_published = BooleanField("Published")
+    is_published = BooleanField("Published", default=True)  # Set default to True
     sub_questions = FieldList(FormField(SubQuestionForm), min_entries=1)
     submit = SubmitField("Save Question")
 

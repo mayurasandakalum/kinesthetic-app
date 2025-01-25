@@ -176,6 +176,27 @@ def logout():
     return redirect(url_for("quiz.home"))
 
 
+def batch_get_subquestions(question_ids):
+    """Helper function to get sub-questions in batches"""
+    sub_questions_by_question = {}
+
+    # Process question_ids in batches of 30
+    for i in range(0, len(question_ids), 30):
+        batch_ids = question_ids[i : i + 30]
+        sub_questions_ref = (
+            db.collection("sub_questions").where("question_id", "in", batch_ids).get()
+        )
+
+        # Group sub-questions by question_id
+        for sub_doc in sub_questions_ref:
+            sub_q = SubQuestion.from_doc(sub_doc)
+            if sub_q.question_id not in sub_questions_by_question:
+                sub_questions_by_question[sub_q.question_id] = []
+            sub_questions_by_question[sub_q.question_id].append(sub_q)
+
+    return sub_questions_by_question
+
+
 @quiz_blueprint.route("/manage/questions")
 def manage_questions():
     # Get all questions in a single query
@@ -185,25 +206,12 @@ def manage_questions():
         .get()
     )
 
-    # Get all sub-questions in a single batch
+    # Get all sub-questions in batches
     all_questions = [Question.from_doc(doc) for doc in questions_ref]
     question_ids = [q.id for q in all_questions]
 
-    # Batch load all sub-questions
-    sub_questions_by_question = {}
-    if question_ids:
-        sub_questions_ref = (
-            db.collection("sub_questions")
-            .where("question_id", "in", question_ids)
-            .get()
-        )
-
-        # Group sub-questions by question_id
-        for sub_doc in sub_questions_ref:
-            sub_q = SubQuestion.from_doc(sub_doc)
-            if sub_q.question_id not in sub_questions_by_question:
-                sub_questions_by_question[sub_q.question_id] = []
-            sub_questions_by_question[sub_q.question_id].append(sub_q)
+    # Get sub-questions using batching
+    sub_questions_by_question = batch_get_subquestions(question_ids)
 
     # Organize questions by subject
     questions_by_subject = {}
@@ -366,3 +374,35 @@ def get_answer_methods(subject):  # Remove @login_required decorator
     # Get the answer methods for the selected subject
     methods = Subject.ANSWER_METHODS.get(subject, [])
     return jsonify({"methods": methods})
+
+
+@quiz_blueprint.route("/manage/questions/<question_id>/delete", methods=["POST"])
+@login_required
+def delete_question(question_id):
+    try:
+        # Delete all sub-questions first
+        sub_questions = (
+            db.collection("sub_questions").where("question_id", "==", question_id).get()
+        )
+        for sub_q in sub_questions:
+            sub_q.reference.delete()
+
+        # Then delete the question
+        db.collection("questions").document(question_id).delete()
+        flash("Question deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error deleting question: {str(e)}", "error")
+
+    return redirect(url_for("quiz.manage_questions"))
+
+
+@quiz_blueprint.route("/manage/subquestions/<subquestion_id>/delete", methods=["POST"])
+@login_required
+def delete_subquestion(subquestion_id):
+    try:
+        db.collection("sub_questions").document(subquestion_id).delete()
+        flash("Sub-question deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error deleting sub-question: {str(e)}", "error")
+
+    return redirect(url_for("quiz.manage_questions"))
