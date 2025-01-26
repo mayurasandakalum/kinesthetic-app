@@ -3,6 +3,7 @@ from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from firebase_admin import firestore
 from datetime import datetime  # Add this import at the top
+import random  # Add this import
 
 from .models import (
     User,
@@ -59,6 +60,7 @@ def leaderboard():
 @quiz_blueprint.route("/play", methods=["GET", "POST"])
 @login_required
 def play():
+    # Handle POST request
     if request.method == "POST":
         question_id = request.form.get("question_pk")
         answer_method = request.form.get("answer_method")
@@ -102,14 +104,28 @@ def play():
 
         return redirect(url_for("quiz.play"))
 
-    # Get a new question
+    # Handle GET request
+    subject = request.args.get("subject", Subject.ADDITION)
     quiz_profile = QuizProfile.get_by_user_id(current_user.id)
     if not quiz_profile:
         quiz_profile = QuizProfile(user_id=current_user.id)
         quiz_profile.save()
 
-    question = quiz_profile.get_new_question()
-    return render_template("quiz/play.html", question=question)
+    # Get questions filtered by subject
+    questions_ref = (
+        db.collection("questions")
+        .where("subject", "==", subject)
+        .where("is_published", "==", True)
+        .get()
+    )
+    available_questions = [Question.from_doc(q) for q in questions_ref]
+
+    if available_questions:
+        question = random.choice(available_questions)
+        return render_template("quiz/play.html", question=question, subject=subject)
+    else:
+        flash("No questions available for this subject.", "warning")
+        return redirect(url_for("quiz.user_home"))
 
 
 @quiz_blueprint.route("/submission-result/<int:attempted_question_pk>")
@@ -406,3 +422,23 @@ def delete_subquestion(subquestion_id):
         flash(f"Error deleting sub-question: {str(e)}", "error")
 
     return redirect(url_for("quiz.manage_questions"))
+
+
+@quiz_blueprint.route("/lesson-instructions/<subject>")
+@login_required
+def lesson_instructions(subject):
+    subject_names = {
+        "addition": "එකතු කිරීම පාඩම",
+        "subtraction": "අඩු කිරීම පාඩම",
+        "time": "කාලය පාඩම",
+    }
+
+    if subject not in subject_names:
+        flash("Invalid subject selected", "error")
+        return redirect(url_for("quiz.user_home"))
+
+    return render_template(
+        "quiz/lesson_instructions.html",
+        subject=subject,
+        subject_name=subject_names[subject],
+    )
