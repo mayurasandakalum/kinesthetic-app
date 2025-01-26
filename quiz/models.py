@@ -85,18 +85,23 @@ class QuizProfile:
         self.created = created if created else datetime.utcnow()
         self.modified = modified if modified else datetime.utcnow()
         self._user = None  # Cache for user object
+        self.completed_lessons = []
+        self.current_lesson_attempts = 0
 
     @staticmethod
     def get_by_user_id(user_id):
         profile = db.collection("quiz_profiles").document(str(user_id)).get()
         if profile.exists:
             data = profile.to_dict()
-            return QuizProfile(
+            profile = QuizProfile(
                 user_id=data.get("user_id"),
                 total_score=data.get("total_score", 0.0),
                 created=data.get("created"),
                 modified=data.get("modified"),
             )
+            profile.completed_lessons = data.get("completed_lessons", [])
+            profile.current_lesson_attempts = data.get("current_lesson_attempts", 0)
+            return profile
         return None
 
     def save(self):
@@ -105,6 +110,8 @@ class QuizProfile:
             "total_score": self.total_score,
             "created": self.created,
             "modified": self.modified,
+            "completed_lessons": self.completed_lessons,
+            "current_lesson_attempts": self.current_lesson_attempts,
         }
         db.collection("quiz_profiles").document(str(self.user_id)).set(data)
 

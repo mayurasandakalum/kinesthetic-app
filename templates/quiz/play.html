@@ -11,6 +11,18 @@
 </div>
 {% else %}
 <div class="container">
+  <!-- Add progress indicator with default value -->
+  <div class="progress mb-4">
+    <div class="progress-bar" role="progressbar" style="width: {{ ((5 - (remaining_questions or 5)) * 20) }}%"
+      aria-valuenow="{{ 5 - (remaining_questions or 5) }}" aria-valuemin="0" aria-valuemax="5">
+      {{ 5 - (remaining_questions or 5) }}/5 Questions
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    <i class="fas fa-info-circle"></i> තව ප්‍රශ්න {{ remaining_questions or 5 }} යි
+  </div>
+
   <div class="jumbotron my-4">
     <!-- Main question with HTML content -->
     {{ question.text|safe }}

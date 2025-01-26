@@ -36,7 +36,8 @@ def home():
 @quiz_blueprint.route("/user-home")
 @login_required
 def user_home():
-    return render_template("quiz/user_home.html")
+    quiz_profile = QuizProfile.get_by_user_id(current_user.id)
+    return render_template("quiz/user_home.html", quiz_profile=quiz_profile)
 
 
 @quiz_blueprint.route("/leaderboard")
@@ -60,7 +61,29 @@ def leaderboard():
 @quiz_blueprint.route("/play", methods=["GET", "POST"])
 @login_required
 def play():
-    # Handle POST request
+    quiz_profile = QuizProfile.get_by_user_id(current_user.id)
+    if not quiz_profile:
+        quiz_profile = QuizProfile(user_id=current_user.id)
+        quiz_profile.save()
+
+    subject = request.args.get("subject", Subject.ADDITION)
+
+    # Check if user has completed all lessons
+    if len(quiz_profile.completed_lessons) == len(Subject.CHOICES):
+        return render_template("quiz/all_lessons_completed.html")
+
+    # Check if current subject is completed and redirect to next subject
+    if subject in quiz_profile.completed_lessons:
+        next_subject = None
+        for s, _ in Subject.CHOICES:
+            if s not in quiz_profile.completed_lessons:
+                next_subject = s
+                break
+        if next_subject:
+            return redirect(url_for("quiz.lesson_instructions", subject=next_subject))
+        return redirect(url_for("quiz.leaderboard"))
+
+    # Handle POST request for answering questions
     if request.method == "POST":
         question_id = request.form.get("question_pk")
         answer_method = request.form.get("answer_method")
@@ -102,16 +125,23 @@ def play():
                     quiz_profile.total_score += points
                     quiz_profile.save()
 
-        return redirect(url_for("quiz.play"))
+        # Update attempts counter
+        quiz_profile.current_lesson_attempts += 1
+
+        # Check if lesson is complete (5 questions answered)
+        if quiz_profile.current_lesson_attempts >= 5:
+            quiz_profile.completed_lessons.append(subject)
+            quiz_profile.current_lesson_attempts = 0
+            quiz_profile.save()
+            if len(quiz_profile.completed_lessons) == len(Subject.CHOICES):
+                return redirect(url_for("quiz.all_lessons_completed"))
+            return redirect(url_for("quiz.user_home"))
+
+        quiz_profile.save()
+        return redirect(url_for("quiz.play", subject=subject))
 
     # Handle GET request
-    subject = request.args.get("subject", Subject.ADDITION)
-    quiz_profile = QuizProfile.get_by_user_id(current_user.id)
-    if not quiz_profile:
-        quiz_profile = QuizProfile(user_id=current_user.id)
-        quiz_profile.save()
-
-    # Get questions filtered by subject
+    # Get 5 random questions for the current subject
     questions_ref = (
         db.collection("questions")
         .where("subject", "==", subject)
@@ -120,12 +150,38 @@ def play():
     )
     available_questions = [Question.from_doc(q) for q in questions_ref]
 
-    if available_questions:
-        question = random.choice(available_questions)
-        return render_template("quiz/play.html", question=question, subject=subject)
-    else:
+    if not available_questions:
         flash("No questions available for this subject.", "warning")
         return redirect(url_for("quiz.user_home"))
+
+    # Add default value for remaining_questions
+    remaining_questions = 5 - (quiz_profile.current_lesson_attempts or 0)
+
+    if quiz_profile.current_lesson_attempts >= 5:
+        quiz_profile.completed_lessons.append(subject)
+        quiz_profile.current_lesson_attempts = 0
+        quiz_profile.save()
+
+        # Find next subject
+        next_subject = None
+        for s, _ in Subject.CHOICES:
+            if s not in quiz_profile.completed_lessons:
+                next_subject = s
+                break
+
+        if next_subject:
+            return redirect(url_for("quiz.lesson_instructions", subject=next_subject))
+        return redirect(url_for("quiz.leaderboard"))
+
+    # Select a random question
+    question = random.choice(available_questions)
+
+    return render_template(
+        "quiz/play.html",
+        question=question,
+        subject=subject,
+        remaining_questions=remaining_questions,
+    )
 
 
 @quiz_blueprint.route("/submission-result/<int:attempted_question_pk>")
