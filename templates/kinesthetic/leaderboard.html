@@ -14,11 +14,11 @@ title %} {% block content %}
       </tr>
     </thead>
     <tbody>
-      {% for quiz_profile in top_quiz_profiles %}
+      {% for kinesthetic_profile in top_kinesthetic_profiles %}
       <tr>
         <td>{{ loop.index }}</td>
-        <td>{{ quiz_profile.user.username if quiz_profile.user else 'Unknown User' }}</td>
-        <td>{{ quiz_profile.total_score }}</td>
+        <td>{{ kinesthetic_profile.user.username if kinesthetic_profile.user else 'Unknown User' }}</td>
+        <td>{{ kinesthetic_profile.total_score }}</td>
       </tr>
       {% endfor %}
     </tbody>

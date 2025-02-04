@@ -6,7 +6,7 @@
   <div class="jumbotron my-4">
     <h1>පුහුණුව අවසන්!</h1>
     <p>ඔබ සියලුම ප්‍රශ්න සම්පූර්ණ කර ඇත.</p>
-    <a href="{{ url_for('quiz.leaderboard') }}" class="btn btn-primary">ප්‍රතිඵල බලන්න</a>
+    <a href="{{ url_for('kinesthetic.leaderboard') }}" class="btn btn-primary">ප්‍රතිඵල බලන්න</a>
   </div>
 </div>
 {% else %}
@@ -46,7 +46,8 @@
 
         <div id="collapse{{ loop.index }}" class="collapse" data-bs-parent="#subQuestionsAccordion">
           <div class="card-body">
-            <form method="POST" action="{{ url_for('quiz.play') }}" class="answer-form" enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('kinesthetic.play') }}" class="answer-form"
+              enctype="multipart/form-data">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="question_pk" value="{{ question.id }}">
               <input type="hidden" name="answer_method" value="{{ question.answer_method }}">

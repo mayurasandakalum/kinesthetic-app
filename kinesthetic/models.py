@@ -90,7 +90,7 @@ class QuizProfile:
 
     @staticmethod
     def get_by_user_id(user_id):
-        profile = db.collection("quiz_profiles").document(str(user_id)).get()
+        profile = db.collection("kinesthetic_profiles").document(str(user_id)).get()
         if profile.exists:
             data = profile.to_dict()
             profile = QuizProfile(
@@ -113,7 +113,7 @@ class QuizProfile:
             "completed_lessons": self.completed_lessons,
             "current_lesson_attempts": self.current_lesson_attempts,
         }
-        db.collection("quiz_profiles").document(str(self.user_id)).set(data)
+        db.collection("kinesthetic_profiles").document(str(self.user_id)).set(data)
 
     def get_new_question(self):
         # Get all attempted questions

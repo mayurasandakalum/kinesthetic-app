@@ -17,7 +17,7 @@
         </form>
         <div class="text-center">
           <p>Don't have an account?</p>
-          <a href="{{ url_for('quiz.register') }}" class="btn btn-success">Register</a>
+          <a href="{{ url_for('kinesthetic.register') }}" class="btn btn-success">Register</a>
         </div>
       </div>
     </div>
@@ -30,9 +30,9 @@
     <p class="display-4 d-none d-sm-block">
       Test your skills and become a master.
     </p>
-    <p class="lead">We organize quizzes on various topics.</p>
-    <a href="{{ url_for('quiz.play') }}" class="btn btn-lg btn-info mt-1">Let's play</a>
-    <a href="{{ url_for('quiz.leaderboard') }}" class="btn btn-lg btn-info mt-1">Leaderboard</a>
+    <p class="lead">We organize kinestheticzes on various topics.</p>
+    <a href="{{ url_for('kinesthetic.play') }}" class="btn btn-lg btn-info mt-1">Let's play</a>
+    <a href="{{ url_for('kinesthetic.leaderboard') }}" class="btn btn-lg btn-info mt-1">Leaderboard</a>
   </div>
 </section>
 {% endif %} {% endblock %}

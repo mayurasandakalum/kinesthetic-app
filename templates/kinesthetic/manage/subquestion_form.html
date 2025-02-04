@@ -4,9 +4,9 @@
 <div class="container py-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('quiz.manage_questions') }}">Question Bank</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('kinesthetic.manage_questions') }}">Question Bank</a></li>
             <li class="breadcrumb-item"><a
-                    href="{{ url_for('quiz.edit_question', question_id=request.view_args.get('question_id', subquestion.question_id if subquestion else None)) }}">Question
+                    href="{{ url_for('kinesthetic.edit_question', question_id=request.view_args.get('question_id', subquestion.question_id if subquestion else None)) }}">Question
                     Details</a></li>
             <li class="breadcrumb-item active">{{ title }}</li>
         </ol>
@@ -104,7 +104,7 @@
                         <!-- Form Actions -->
                         <div class="d-flex gap-2">
                             {{ form.submit(class="btn btn-primary px-4") }}
-                            <a href="{{ url_for('quiz.manage_questions') }}"
+                            <a href="{{ url_for('kinesthetic.manage_questions') }}"
                                 class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>

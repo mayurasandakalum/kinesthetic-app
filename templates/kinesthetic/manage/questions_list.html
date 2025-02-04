@@ -11,7 +11,8 @@
             </button>
             <ul class="dropdown-menu">
                 {% for code, name in subjects %}
-                <li><a class="dropdown-item" href="{{ url_for('quiz.new_question', subject=code) }}">{{ name }}</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('kinesthetic.new_question', subject=code) }}">{{ name
+                        }}</a></li>
                 {% endfor %}
             </ul>
         </div>
@@ -52,7 +53,7 @@
                             </h6>
                         </div>
                         <div class="btn-group">
-                            <a href="{{ url_for('quiz.edit_question', question_id=question.id) }}"
+                            <a href="{{ url_for('kinesthetic.edit_question', question_id=question.id) }}"
                                 class="btn btn-outline-primary btn-sm">
                                 <i class="bi bi-pencil me-1"></i>Edit
                             </a>
@@ -83,7 +84,7 @@
                                         </small>
                                     </div>
                                     <div class="btn-group">
-                                        <a href="{{ url_for('quiz.edit_subquestion', subquestion_id=sub.id) }}"
+                                        <a href="{{ url_for('kinesthetic.edit_subquestion', subquestion_id=sub.id) }}"
                                             class="btn btn-outline-secondary btn-sm">
                                             <i class="bi bi-pencil me-1"></i>Edit
                                         </a>
@@ -108,7 +109,7 @@
                                         </div>
                                         <div class="modal-footer">
                                             <form
-                                                action="{{ url_for('quiz.delete_subquestion', subquestion_id=sub.id) }}"
+                                                action="{{ url_for('kinesthetic.delete_subquestion', subquestion_id=sub.id) }}"
                                                 method="POST">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                                                 <button type="button" class="btn btn-secondary"
@@ -123,7 +124,7 @@
                         </div>
 
                         <div class="mt-3">
-                            <a href="{{ url_for('quiz.new_subquestion', question_id=question.id) }}"
+                            <a href="{{ url_for('kinesthetic.new_subquestion', question_id=question.id) }}"
                                 class="btn btn-success btn-sm">
                                 <i class="bi bi-plus-lg me-1"></i>Add Sub-question
                             </a>
@@ -145,7 +146,8 @@
                                 sub-questions.</p>
                         </div>
                         <div class="modal-footer">
-                            <form action="{{ url_for('quiz.delete_question', question_id=question.id) }}" method="POST">
+                            <form action="{{ url_for('kinesthetic.delete_question', question_id=question.id) }}"
+                                method="POST">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="submit" class="btn btn-danger">Delete</button>
@@ -159,7 +161,7 @@
             <div class="text-center py-5">
                 <i class="bi bi-inbox display-4 text-muted"></i>
                 <p class="mt-2">No questions in {{ name }} yet</p>
-                <a href="{{ url_for('quiz.new_question') }}" class="btn btn-primary">
+                <a href="{{ url_for('kinesthetic.new_question') }}" class="btn btn-primary">
                     <i class="bi bi-plus-lg me-2"></i>Add Question
                 </a>
             </div>

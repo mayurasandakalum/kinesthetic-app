@@ -23,65 +23,74 @@ from .forms import (
 
 db = firestore.client()
 
-quiz_blueprint = Blueprint(
-    "quiz", __name__, template_folder="../templates/quiz", static_folder="../static"
+kinesthetic_blueprint = Blueprint(
+    "kinesthetic",
+    __name__,
+    template_folder="../templates/kinesthetic",
+    static_folder="../static",
 )
 
 
-@quiz_blueprint.route("/")
+@kinesthetic_blueprint.route("/")
 def home():
-    return render_template("quiz/home.html")
+    return render_template("kinesthetic/home.html")
 
 
-@quiz_blueprint.route("/user-home")
+@kinesthetic_blueprint.route("/user-home")
 @login_required
 def user_home():
-    quiz_profile = QuizProfile.get_by_user_id(current_user.id)
-    return render_template("quiz/user_home.html", quiz_profile=quiz_profile)
+    kinesthetic_profile = QuizProfile.get_by_user_id(current_user.id)
+    return render_template(
+        "kinesthetic/user_home.html", kinesthetic_profile=kinesthetic_profile
+    )
 
 
-@quiz_blueprint.route("/leaderboard")
+@kinesthetic_blueprint.route("/leaderboard")
 def leaderboard():
-    # Get all quiz profiles and sort by total_score
+    # Get all kinesthetic profiles and sort by total_score
     profiles_ref = (
-        db.collection("quiz_profiles")
+        db.collection("kinesthetic_profiles")
         .order_by("total_score", direction=firestore.Query.DESCENDING)
         .limit(500)
     )
     profiles = profiles_ref.get()
-    top_quiz_profiles = [QuizProfile(**profile.to_dict()) for profile in profiles]
-    total_count = len(top_quiz_profiles)
+    top_kinesthetic_profiles = [
+        QuizProfile(**profile.to_dict()) for profile in profiles
+    ]
+    total_count = len(top_kinesthetic_profiles)
     return render_template(
-        "quiz/leaderboard.html",
-        top_quiz_profiles=top_quiz_profiles,
+        "kinesthetic/leaderboard.html",
+        top_kinesthetic_profiles=top_kinesthetic_profiles,
         total_count=total_count,
     )
 
 
-@quiz_blueprint.route("/play", methods=["GET", "POST"])
+@kinesthetic_blueprint.route("/play", methods=["GET", "POST"])
 @login_required
 def play():
-    quiz_profile = QuizProfile.get_by_user_id(current_user.id)
-    if not quiz_profile:
-        quiz_profile = QuizProfile(user_id=current_user.id)
-        quiz_profile.save()
+    kinesthetic_profile = QuizProfile.get_by_user_id(current_user.id)
+    if not kinesthetic_profile:
+        kinesthetic_profile = QuizProfile(user_id=current_user.id)
+        kinesthetic_profile.save()
 
     subject = request.args.get("subject", Subject.ADDITION)
 
     # Check if user has completed all lessons
-    if len(quiz_profile.completed_lessons) == len(Subject.CHOICES):
-        return render_template("quiz/all_lessons_completed.html")
+    if len(kinesthetic_profile.completed_lessons) == len(Subject.CHOICES):
+        return render_template("kinesthetic/all_lessons_completed.html")
 
     # Check if current subject is completed and redirect to next subject
-    if subject in quiz_profile.completed_lessons:
+    if subject in kinesthetic_profile.completed_lessons:
         next_subject = None
         for s, _ in Subject.CHOICES:
-            if s not in quiz_profile.completed_lessons:
+            if s not in kinesthetic_profile.completed_lessons:
                 next_subject = s
                 break
         if next_subject:
-            return redirect(url_for("quiz.lesson_instructions", subject=next_subject))
-        return redirect(url_for("quiz.leaderboard"))
+            return redirect(
+                url_for("kinesthetic.lesson_instructions", subject=next_subject)
+            )
+        return redirect(url_for("kinesthetic.leaderboard"))
 
     # Handle POST request for answering questions
     if request.method == "POST":
@@ -120,25 +129,25 @@ def play():
 
             # Update score if correct
             if is_correct:
-                quiz_profile = QuizProfile.get_by_user_id(current_user.id)
-                if quiz_profile:
-                    quiz_profile.total_score += points
-                    quiz_profile.save()
+                kinesthetic_profile = QuizProfile.get_by_user_id(current_user.id)
+                if kinesthetic_profile:
+                    kinesthetic_profile.total_score += points
+                    kinesthetic_profile.save()
 
         # Update attempts counter
-        quiz_profile.current_lesson_attempts += 1
+        kinesthetic_profile.current_lesson_attempts += 1
 
         # Check if lesson is complete (5 questions answered)
-        if quiz_profile.current_lesson_attempts >= 5:
-            quiz_profile.completed_lessons.append(subject)
-            quiz_profile.current_lesson_attempts = 0
-            quiz_profile.save()
-            if len(quiz_profile.completed_lessons) == len(Subject.CHOICES):
-                return redirect(url_for("quiz.all_lessons_completed"))
-            return redirect(url_for("quiz.user_home"))
+        if kinesthetic_profile.current_lesson_attempts >= 5:
+            kinesthetic_profile.completed_lessons.append(subject)
+            kinesthetic_profile.current_lesson_attempts = 0
+            kinesthetic_profile.save()
+            if len(kinesthetic_profile.completed_lessons) == len(Subject.CHOICES):
+                return redirect(url_for("kinesthetic.all_lessons_completed"))
+            return redirect(url_for("kinesthetic.user_home"))
 
-        quiz_profile.save()
-        return redirect(url_for("quiz.play", subject=subject))
+        kinesthetic_profile.save()
+        return redirect(url_for("kinesthetic.play", subject=subject))
 
     # Handle GET request
     # Get 5 random questions for the current subject
@@ -152,74 +161,76 @@ def play():
 
     if not available_questions:
         flash("No questions available for this subject.", "warning")
-        return redirect(url_for("quiz.user_home"))
+        return redirect(url_for("kinesthetic.user_home"))
 
     # Add default value for remaining_questions
-    remaining_questions = 5 - (quiz_profile.current_lesson_attempts or 0)
+    remaining_questions = 5 - (kinesthetic_profile.current_lesson_attempts or 0)
 
-    if quiz_profile.current_lesson_attempts >= 5:
-        quiz_profile.completed_lessons.append(subject)
-        quiz_profile.current_lesson_attempts = 0
-        quiz_profile.save()
+    if kinesthetic_profile.current_lesson_attempts >= 5:
+        kinesthetic_profile.completed_lessons.append(subject)
+        kinesthetic_profile.current_lesson_attempts = 0
+        kinesthetic_profile.save()
 
         # Find next subject
         next_subject = None
         for s, _ in Subject.CHOICES:
-            if s not in quiz_profile.completed_lessons:
+            if s not in kinesthetic_profile.completed_lessons:
                 next_subject = s
                 break
 
         if next_subject:
-            return redirect(url_for("quiz.lesson_instructions", subject=next_subject))
-        return redirect(url_for("quiz.leaderboard"))
+            return redirect(
+                url_for("kinesthetic.lesson_instructions", subject=next_subject)
+            )
+        return redirect(url_for("kinesthetic.leaderboard"))
 
     # Select a random question
     question = random.choice(available_questions)
 
     return render_template(
-        "quiz/play.html",
+        "kinesthetic/play.html",
         question=question,
         subject=subject,
         remaining_questions=remaining_questions,
     )
 
 
-@quiz_blueprint.route("/submission-result/<int:attempted_question_pk>")
+@kinesthetic_blueprint.route("/submission-result/<int:attempted_question_pk>")
 @login_required
 def submission_result(attempted_question_pk):
     attempted_question = AttemptedQuestion.query.get_or_404(attempted_question_pk)
     return render_template(
-        "quiz/submission_result.html", attempted_question=attempted_question
+        "kinesthetic/submission_result.html", attempted_question=attempted_question
     )
 
 
-@quiz_blueprint.route("/login", methods=["GET", "POST"])
+@kinesthetic_blueprint.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("quiz.home"))
+        return redirect(url_for("kinesthetic.home"))
 
     form = UserLoginForm()
     if form.validate_on_submit():
         user = User.get_by_username(form.username.data)
         if user and check_password_hash(user.password_hash, form.password.data):
             login_user(user)
-            return redirect(url_for("quiz.user_home"))
+            return redirect(url_for("kinesthetic.user_home"))
         else:
             flash("Invalid username/password!", "danger")
-    return render_template("quiz/login.html", form=form, title="Login")
+    return render_template("kinesthetic/login.html", form=form, title="Login")
 
 
-@quiz_blueprint.route("/register", methods=["GET", "POST"])
+@kinesthetic_blueprint.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("quiz.home"))
+        return redirect(url_for("kinesthetic.home"))
 
     form = RegistrationForm()
     if form.validate_on_submit():
         user = User.get_by_username(form.username.data)
         if user:
             flash("Username already exists")
-            return redirect(url_for("quiz.register"))
+            return redirect(url_for("kinesthetic.register"))
 
         password_hash = generate_password_hash(form.password.data)
         new_user = User(
@@ -232,20 +243,20 @@ def register():
 
         new_user.save()
 
-        quiz_profile = QuizProfile(user_id=new_user.id)
-        quiz_profile.save()
+        kinesthetic_profile = QuizProfile(user_id=new_user.id)
+        kinesthetic_profile.save()
 
         flash("Registration successful!")
-        return redirect(url_for("quiz.login"))
+        return redirect(url_for("kinesthetic.login"))
 
-    return render_template("quiz/registration.html", form=form, title="Register")
+    return render_template("kinesthetic/registration.html", form=form, title="Register")
 
 
-@quiz_blueprint.route("/logout")
+@kinesthetic_blueprint.route("/logout")
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for("quiz.home"))
+    return redirect(url_for("kinesthetic.home"))
 
 
 def batch_get_subquestions(question_ids):
@@ -269,7 +280,7 @@ def batch_get_subquestions(question_ids):
     return sub_questions_by_question
 
 
-@quiz_blueprint.route("/manage/questions")
+@kinesthetic_blueprint.route("/manage/questions")
 def manage_questions():
     # Get all questions in a single query
     questions_ref = (
@@ -294,13 +305,13 @@ def manage_questions():
         questions_by_subject[question.subject].append(question)
 
     return render_template(
-        "quiz/manage/questions_list.html",
+        "kinesthetic/manage/questions_list.html",
         questions_by_subject=questions_by_subject,
         subjects=Subject.CHOICES,
     )
 
 
-@quiz_blueprint.route("/manage/questions/new", methods=["GET", "POST"])
+@kinesthetic_blueprint.route("/manage/questions/new", methods=["GET", "POST"])
 def new_question():
     # Get subject from query parameter if it exists
     subject = request.args.get("subject", Subject.ADDITION)
@@ -333,22 +344,22 @@ def new_question():
             subquestion.save()
 
         flash("Question and sub-questions created successfully!", "success")
-        return redirect(url_for("quiz.manage_questions"))
+        return redirect(url_for("kinesthetic.manage_questions"))
     return render_template(
-        "quiz/manage/question_form.html",
+        "kinesthetic/manage/question_form.html",
         form=form,
         title="New Question",
         initial_subject=subject,
     )
 
 
-@quiz_blueprint.route("/manage/questions/<question_id>", methods=["GET", "POST"])
+@kinesthetic_blueprint.route("/manage/questions/<question_id>", methods=["GET", "POST"])
 @login_required  # Keep this decorator here
 def edit_question(question_id):
     question_ref = db.collection("questions").document(question_id).get()
     if not question_ref.exists:
         flash("Question not found!", "error")
-        return redirect(url_for("quiz.manage_questions"))
+        return redirect(url_for("kinesthetic.manage_questions"))
 
     question = Question.from_doc(question_ref)
     form = QuestionForm(obj=question)
@@ -365,20 +376,22 @@ def edit_question(question_id):
             # Update the question in the database
             question.save()
             flash("Question updated successfully!", "success")
-            return redirect(url_for("quiz.manage_questions"))
+            return redirect(url_for("kinesthetic.manage_questions"))
         except Exception as e:
             flash(f"Error updating question: {str(e)}", "error")
-            return redirect(url_for("quiz.edit_question", question_id=question_id))
+            return redirect(
+                url_for("kinesthetic.edit_question", question_id=question_id)
+            )
 
     return render_template(
-        "quiz/manage/question_form.html",
+        "kinesthetic/manage/question_form.html",
         form=form,
         question=question,
         title="Edit Question",
     )
 
 
-@quiz_blueprint.route(
+@kinesthetic_blueprint.route(
     "/manage/questions/<question_id>/subquestions/new", methods=["GET", "POST"]
 )
 def new_subquestion(question_id):
@@ -399,21 +412,23 @@ def new_subquestion(question_id):
         )
         subquestion.save()
         flash("Sub-question added successfully!", "success")
-        return redirect(url_for("quiz.manage_questions"))  # Changed this line
+        return redirect(url_for("kinesthetic.manage_questions"))  # Changed this line
     return render_template(
-        "quiz/manage/subquestion_form.html",
+        "kinesthetic/manage/subquestion_form.html",
         form=form,
         question_id=question_id,
         title="New Sub-question",
     )
 
 
-@quiz_blueprint.route("/manage/subquestions/<subquestion_id>", methods=["GET", "POST"])
+@kinesthetic_blueprint.route(
+    "/manage/subquestions/<subquestion_id>", methods=["GET", "POST"]
+)
 def edit_subquestion(subquestion_id):
     subquestion_ref = db.collection("sub_questions").document(subquestion_id).get()
     if not subquestion_ref.exists:
         flash("Sub-question not found!", "error")
-        return redirect(url_for("quiz.manage_questions"))
+        return redirect(url_for("kinesthetic.manage_questions"))
 
     subquestion = SubQuestion.from_doc(subquestion_ref)
     form = SubQuestionForm(obj=subquestion)
@@ -431,24 +446,24 @@ def edit_subquestion(subquestion_id):
         subquestion.hint = form.hint.data
         subquestion.save()
         flash("Sub-question updated successfully!", "success")
-        return redirect(url_for("quiz.manage_questions"))  # Changed this line
+        return redirect(url_for("kinesthetic.manage_questions"))  # Changed this line
 
     return render_template(
-        "quiz/manage/subquestion_form.html",
+        "kinesthetic/manage/subquestion_form.html",
         form=form,
         subquestion=subquestion,
         title="Edit Sub-question",
     )
 
 
-@quiz_blueprint.route("/api/answer-methods/<subject>")
+@kinesthetic_blueprint.route("/api/answer-methods/<subject>")
 def get_answer_methods(subject):  # Remove @login_required decorator
     # Get the answer methods for the selected subject
     methods = Subject.ANSWER_METHODS.get(subject, [])
     return jsonify({"methods": methods})
 
 
-@quiz_blueprint.route("/manage/questions/<question_id>/delete", methods=["POST"])
+@kinesthetic_blueprint.route("/manage/questions/<question_id>/delete", methods=["POST"])
 @login_required
 def delete_question(question_id):
     try:
@@ -465,10 +480,12 @@ def delete_question(question_id):
     except Exception as e:
         flash(f"Error deleting question: {str(e)}", "error")
 
-    return redirect(url_for("quiz.manage_questions"))
+    return redirect(url_for("kinesthetic.manage_questions"))
 
 
-@quiz_blueprint.route("/manage/subquestions/<subquestion_id>/delete", methods=["POST"])
+@kinesthetic_blueprint.route(
+    "/manage/subquestions/<subquestion_id>/delete", methods=["POST"]
+)
 @login_required
 def delete_subquestion(subquestion_id):
     try:
@@ -477,10 +494,10 @@ def delete_subquestion(subquestion_id):
     except Exception as e:
         flash(f"Error deleting sub-question: {str(e)}", "error")
 
-    return redirect(url_for("quiz.manage_questions"))
+    return redirect(url_for("kinesthetic.manage_questions"))
 
 
-@quiz_blueprint.route("/lesson-instructions/<subject>")
+@kinesthetic_blueprint.route("/lesson-instructions/<subject>")
 @login_required
 def lesson_instructions(subject):
     subject_names = {
@@ -491,10 +508,10 @@ def lesson_instructions(subject):
 
     if subject not in subject_names:
         flash("Invalid subject selected", "error")
-        return redirect(url_for("quiz.user_home"))
+        return redirect(url_for("kinesthetic.user_home"))
 
     return render_template(
-        "quiz/lesson_instructions.html",
+        "kinesthetic/lesson_instructions.html",
         subject=subject,
         subject_name=subject_names[subject],
     )

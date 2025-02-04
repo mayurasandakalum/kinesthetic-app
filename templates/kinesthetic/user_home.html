@@ -10,12 +10,13 @@
             <div class="card h-100">
                 <div class="card-body text-center">
                     <h2 class="card-title">එකතු කිරීම</h2>
-                    {% if quiz_profile and 'addition' in quiz_profile.completed_lessons %}
+                    {% if kinesthetic_profile and 'addition' in kinesthetic_profile.completed_lessons %}
                     <p class="card-text text-success">Completed</p>
                     {% else %}
                     <p class="card-text">Learn addition using abacus</p>
                     {% endif %}
-                    <a href="{{ url_for('quiz.lesson_instructions', subject='addition') }}" class="btn btn-primary">
+                    <a href="{{ url_for('kinesthetic.lesson_instructions', subject='addition') }}"
+                        class="btn btn-primary">
                         පාඩම ආරම්භ කරන්න
                     </a>
                 </div>
@@ -26,12 +27,13 @@
             <div class="card h-100">
                 <div class="card-body text-center">
                     <h2 class="card-title">අඩු කිරීම</h2>
-                    {% if quiz_profile and 'subtraction' in quiz_profile.completed_lessons %}
+                    {% if kinesthetic_profile and 'subtraction' in kinesthetic_profile.completed_lessons %}
                     <p class="card-text text-success">Completed</p>
                     {% else %}
                     <p class="card-text">Learn subtraction using abacus</p>
                     {% endif %}
-                    <a href="{{ url_for('quiz.lesson_instructions', subject='subtraction') }}" class="btn btn-primary">
+                    <a href="{{ url_for('kinesthetic.lesson_instructions', subject='subtraction') }}"
+                        class="btn btn-primary">
                         පාඩම ආරම්භ කරන්න
                     </a>
                 </div>
@@ -42,12 +44,12 @@
             <div class="card h-100">
                 <div class="card-body text-center">
                     <h2 class="card-title">කාලය</h2>
-                    {% if quiz_profile and 'time' in quiz_profile.completed_lessons %}
+                    {% if kinesthetic_profile and 'time' in kinesthetic_profile.completed_lessons %}
                     <p class="card-text text-success">Completed</p>
                     {% else %}
                     <p class="card-text">Learn to read time using clock</p>
                     {% endif %}
-                    <a href="{{ url_for('quiz.lesson_instructions', subject='time') }}" class="btn btn-primary">
+                    <a href="{{ url_for('kinesthetic.lesson_instructions', subject='time') }}" class="btn btn-primary">
                         පාඩම ආරම්භ කරන්න
                     </a>
                 </div>

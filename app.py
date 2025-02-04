@@ -2,7 +2,7 @@ from flask import Flask, render_template
 from config import Config
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
-from quiz.models import User
+from kinesthetic.models import User
 
 login_manager = LoginManager()
 csrf = CSRFProtect()
@@ -17,12 +17,14 @@ def create_app():
 
     # Initialize login manager with correct login view
     login_manager.init_app(app)
-    login_manager.login_view = "quiz.login"  # Changed from "login" to "quiz.login"
+    login_manager.login_view = (
+        "kinesthetic.login"  # Changed from "login" to "kinesthetic.login"
+    )
 
-    from quiz.routes import quiz_blueprint
-    from quiz.utils import load_initial_questions
+    from kinesthetic.routes import kinesthetic_blueprint
+    from kinesthetic.utils import load_initial_questions
 
-    app.register_blueprint(quiz_blueprint)
+    app.register_blueprint(kinesthetic_blueprint)
 
     # Load initial questions if they don't exist
     with app.app_context():
