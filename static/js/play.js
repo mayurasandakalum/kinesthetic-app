@@ -427,14 +427,22 @@ modal.classList.add('active');
 // Close modal and go to next question
 function closeModalAndContinue() {
 const modal = document.getElementById('resultModal');
+
+// Get the redirect URL from the modal's data attribute
+const redirectUrl = modal.getAttribute('data-redirect-url');
+
 modal.classList.remove('active');
 
 // Clear any confetti
 document.querySelectorAll('.confetti').forEach(el => el.remove());
 
-// Get the URL from data attribute
-const nextUrl = document.getElementById('nextQuestionUrl').getAttribute('data-url');
-window.location.href = nextUrl;
+// Redirect to the next question if URL is available
+if (redirectUrl) {
+    window.location.href = redirectUrl;
+} else {
+    // Fallback to play route if no redirect URL is provided
+    window.location.href = '/kinesthetic/play';
+}
 }
 
 function captureImage(webcamId, subQuestionId, index) {
@@ -584,6 +592,9 @@ const modalTitle = document.getElementById('modalTitle');
 const detailedResults = document.getElementById('detailedResults');
 const correctAnswersCount = document.getElementById('correctAnswersCount');
 const wrongAnswersCount = document.getElementById('wrongAnswersCount');
+
+// Store the redirect URL for use when closing the modal
+modal.setAttribute('data-redirect-url', data.redirect_url || '');
 
 // Count correct and wrong answers
 const totalCorrect = data.results.filter(r => r.is_correct).length;

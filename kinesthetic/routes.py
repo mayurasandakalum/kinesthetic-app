@@ -705,11 +705,15 @@ def process_all_answers():
     question_id = request.form.get("question_pk")
     answer_method = request.form.get("answer_method")
     sub_question_ids = request.form.getlist("sub_question_ids")
+    # Get subject from the form data
+    subject = request.form.get("subject", Subject.ADDITION)
     
     # Initialize response
     response_data = {
         "success": True,
-        "results": []
+        "results": [],
+        "subject": subject,
+        "redirect_url": url_for("kinesthetic.play", subject=subject)
     }
     
     total_points = 0
