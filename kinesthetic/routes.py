@@ -592,3 +592,102 @@ def lesson_instructions(subject):
         subject=subject,
         subject_name=subject_names[subject],
     )
+
+
+@kinesthetic_blueprint.route("/process-answer", methods=["POST"])
+@login_required
+def process_answer():
+    """Process answer submission via AJAX"""
+    question_id = request.form.get("question_pk")
+    answer_method = request.form.get("answer_method")
+    sub_question_id = request.form.get("sub_question_id")
+    
+    # Get all the captured images
+    captured_images = {}
+    for key in request.form:
+        if key.startswith("captured_image_"):
+            captured_images[key] = request.form[key]
+
+    # Initialize response data
+    response_data = {
+        'is_correct': False,
+        'detected_value': None,
+        'expected_value': None,
+        'annotated_image_url': None
+    }
+    
+    # Get the sub-question to check correct answer
+    sub_question_ref = db.collection("sub_questions").document(sub_question_id).get()
+    if not sub_question_ref.exists:
+        return jsonify(response_data), 400
+    
+    sub_question_data = sub_question_ref.to_dict()
+    correct_answer = sub_question_data.get("correct_answer")
+    points = sub_question_data.get("points", 1)
+    
+    # Process answer based on answer method
+    if answer_method == AnswerMethod.ABACUS and captured_images:
+        # Get the first captured image (we'll only use one for now)
+        base64_image = next(iter(captured_images.values()))
+        
+        # Check answer using the abacus service
+        is_correct, detected_value, annotated_image_path = check_abacus_answer(
+            base64_image, correct_answer
+        )
+        
+        # Update response data with detection results
+        response_data['is_correct'] = is_correct
+        response_data['detected_value'] = detected_value
+        response_data['expected_value'] = correct_answer
+        
+        # If there's an annotated image path, copy it to the static folder
+        if annotated_image_path and os.path.exists(annotated_image_path):
+            static_uploads = os.path.join(current_app.static_folder, "uploads")
+            os.makedirs(static_uploads, exist_ok=True)
+            
+            filename = os.path.basename(annotated_image_path)
+            static_path = os.path.join(static_uploads, filename)
+            shutil.copy(annotated_image_path, static_path)
+            
+            # Add the public URL to the response
+            response_data['annotated_image_url'] = f"/static/uploads/{filename}"
+            
+            # Add the path to captured_images for database
+            captured_images["annotated_image"] = f"/static/uploads/{filename}"
+    
+    # Save attempt with detection results
+    result_data = {
+        "detected_value": response_data['detected_value'],
+        "expected_value": response_data['expected_value'],
+    }
+    
+    attempted = AttemptedQuestion(
+        user_id=current_user.id,
+        question_id=question_id,
+        sub_question_id=sub_question_id,
+        is_correct=response_data['is_correct'],
+        images=captured_images,
+        result_data=result_data
+    )
+    attempted.save()
+
+    # Update score if correct
+    if response_data['is_correct']:
+        kinesthetic_profile = QuizProfile.get_by_user_id(current_user.id)
+        if kinesthetic_profile:
+            kinesthetic_profile.total_score += points
+            kinesthetic_profile.save()
+    
+    # Update attempts counter
+    kinesthetic_profile = QuizProfile.get_by_user_id(current_user.id)
+    kinesthetic_profile.current_lesson_attempts += 1
+    
+    # Check if lesson is complete (5 questions answered)
+    subject = request.args.get("subject", Subject.ADDITION)
+    if kinesthetic_profile.current_lesson_attempts >= 5:
+        kinesthetic_profile.completed_lessons.append(subject)
+        kinesthetic_profile.current_lesson_attempts = 0
+        response_data['lesson_completed'] = True
+    
+    kinesthetic_profile.save()
+    return jsonify(response_data)

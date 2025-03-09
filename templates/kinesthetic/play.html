@@ -67,8 +67,8 @@
           </button>
 
           <div id="subQuestion{{ loop.index }}" class="sub-question-content">
-            <form method="POST" action="{{ url_for('kinesthetic.play') }}" class="answer-form"
-              enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('kinesthetic.process_answer') }}" class="answer-form"
+              enctype="multipart/form-data" onsubmit="return submitAnswer(this, event)">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="question_pk" value="{{ question.id }}">
               <input type="hidden" name="answer_method" value="{{ question.answer_method }}">
@@ -127,8 +127,8 @@
                 </div>
 
                 <!-- Submit button -->
-                <button type="submit" class="btn btn-success mt-3">
-                  <i class="fa fa-paper-plane"></i>පිළිතුර යවන්න
+                <button type="submit" class="btn btn-success mt-3" id="submitBtn{{ loop.index }}">
+                  <i class="fa fa-paper-plane"></i> පිළිතුර යවන්න
                 </button>
               </div>
 
@@ -149,6 +149,15 @@
         {% endfor %}
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-content">
+    <div class="spinner"></div>
+    <h3>ඔබගේ පිළිතුර පරීක්ෂා කරමින්...</h3>
+    <p>අපි ඡායාරූපය විශ්ලේෂණය කරමින් සිටිමු, කරුණාකර රැඳී සිටින්න.</p>
   </div>
 </div>
 
@@ -183,10 +192,16 @@
         <span>එම නිසා ඔබේ පිළිතුර නිවැරදියි!</span>
         <span class="emoji">🎊</span>
       </div>
+
+      <!-- Analysis image preview -->
+      <div class="result-image" id="resultImageContainer" style="display: none;">
+        <h4 class="image-title">විශ්ලේෂණය කරන ලද පිංතූරය</h4>
+        <img id="resultImage" src="" alt="Analyzed abacus" class="img-fluid">
+      </div>
     </div>
 
-    <button class="modal-btn" onclick="closeModal()">
-      <span class="emoji">👍</span> හරි
+    <button class="modal-btn" onclick="closeModalAndContinue()">
+      <span class="emoji">👍</span> මීළඟ ප්‍රශ්නය
     </button>
   </div>
 </div>
@@ -491,6 +506,145 @@
       btn.classList.add('pulse-subtle');
     });
   }
+
+  // AJAX form submission
+  function submitAnswer(form, event) {
+    event.preventDefault();
+
+    // Check if an image has been captured
+    const formData = new FormData(form);
+    let imageFound = false;
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith('captured_image_')) {
+        imageFound = true;
+        break;
+      }
+    }
+
+    if (!imageFound) {
+      alert('කරුණාකර පිළිතුර යැවීමට පෙර ඡායාරූපයක් ගන්න.');
+      return false;
+    }
+
+    // Show loading overlay
+    document.getElementById('loadingOverlay').classList.add('active');
+
+    // Submit the form via AJAX
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => response.json())
+      .then(data => {
+        // Hide loading overlay
+        document.getElementById('loadingOverlay').classList.remove('active');
+
+        // Display result in modal
+        showResultData(data);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        // Hide loading overlay
+        document.getElementById('loadingOverlay').classList.remove('active');
+        alert('දෝෂයක් ඇති විය. කරුණාකර යළි උත්සාහ කරන්න.');
+      });
+
+    return false;
+  }
+
+  // Display result data in modal
+  function showResultData(data) {
+    const modal = document.getElementById('resultModal');
+    const modalContainer = document.getElementById('resultModalContainer');
+    const modalIcon = document.getElementById('modalIcon');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const userAnswer = document.getElementById('userAnswer');
+    const correctAnswer = document.getElementById('correctAnswer');
+    const resultImageContainer = document.getElementById('resultImageContainer');
+    const resultImage = document.getElementById('resultImage');
+
+    // Set whether answer is correct or not
+    const isCorrect = data.is_correct;
+
+    if (isCorrect) {
+      // Reset classes and add correct class
+      modalContainer.className = 'result-modal correct-modal';
+
+      // Set correct icon
+      modalIcon.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      `;
+
+      // Set correct title with emoji
+      modalTitle.innerHTML = '🌟 නිවැරදියි! 🌟';
+
+      // Set correct message with emojis
+      modalMessage.innerHTML = `
+        <span class="emoji">🎉</span>
+        <span>ඔබේ පිළිතුර නිවැරදියි!</span>
+        <span class="emoji">🎊</span>
+      `;
+
+      // Create confetti celebration
+      createConfetti();
+    } else {
+      // Reset classes and add wrong class
+      modalContainer.className = 'result-modal wrong-modal';
+
+      // Set incorrect icon
+      modalIcon.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+      `;
+
+      // Set incorrect title with emoji
+      modalTitle.innerHTML = '😕 අපොයි! 😕';
+
+      // Set incorrect message with emojis
+      modalMessage.innerHTML = `
+        <span class="emoji">🤔</span>
+        <span>ඔබේ පිළිතුර වැරදියි. අපි නැවත වරක් උත්සාහ කරමු!</span>
+        <span class="emoji">📚</span>
+      `;
+    }
+
+    // Display detected and correct values
+    userAnswer.textContent = data.detected_value || 'හඳුනාගත නොහැක';
+    correctAnswer.textContent = data.expected_value;
+
+    // Show annotated image if available
+    if (data.annotated_image_url) {
+      resultImageContainer.style.display = 'block';
+      resultImage.src = data.annotated_image_url;
+    } else {
+      resultImageContainer.style.display = 'none';
+    }
+
+    // Show modal
+    modal.classList.add('active');
+  }
+
+  // Close modal and go to next question
+  function closeModalAndContinue() {
+    const modal = document.getElementById('resultModal');
+    modal.classList.remove('active');
+
+    // Clear any confetti
+    document.querySelectorAll('.confetti').forEach(el => el.remove());
+
+    // Redirect to next question
+    window.location.href = "{{ url_for('kinesthetic.play') }}";
+  }
 </script>
 
 <!-- Add CSS for the thumbnail display -->
@@ -528,6 +682,87 @@
 
   .capture-success i {
     margin-right: 5px;
+  }
+
+  /* Loading overlay styles */
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s;
+  }
+
+  .loading-overlay.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .loading-content {
+    text-align: center;
+    color: white;
+    background: rgba(90, 20, 120, 0.4);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    max-width: 90%;
+  }
+
+  .loading-content h3 {
+    margin: 1rem 0;
+    font-size: 1.5rem;
+    color: white;
+  }
+
+  .loading-content p {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 80px;
+    height: 80px;
+    border: 6px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Result image styles */
+  .result-image {
+    margin-top: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+  }
+
+  .image-title {
+    font-size: 1rem;
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .result-image img {
+    max-width: 100%;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   }
 </style>
 {% endif %}
