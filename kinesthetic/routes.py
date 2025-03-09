@@ -691,3 +691,126 @@ def process_answer():
     
     kinesthetic_profile.save()
     return jsonify(response_data)
+
+
+@kinesthetic_blueprint.route("/process-all-answers", methods=["POST"])
+@login_required
+def process_all_answers():
+    """Process all answers for a question's sub-questions together"""
+    # Check for proper request
+    if request.method != "POST":
+        flash("Invalid request method", "error")
+        return redirect(url_for("kinesthetic.play"))
+    
+    question_id = request.form.get("question_pk")
+    answer_method = request.form.get("answer_method")
+    sub_question_ids = request.form.getlist("sub_question_ids")
+    
+    # Initialize response
+    response_data = {
+        "success": True,
+        "results": []
+    }
+    
+    total_points = 0
+    correct_count = 0
+    
+    # Process each sub-question
+    for sub_question_id in sub_question_ids:
+        # Look for captured image for this sub-question
+        image_key = f"captured_image_{sub_question_id}"
+        base64_image = request.form.get(image_key)
+        
+        if not base64_image:
+            continue  # Skip if no image for this sub-question
+            
+        # Get sub-question details
+        sub_question_ref = db.collection("sub_questions").document(sub_question_id).get()
+        if not sub_question_ref.exists:
+            continue
+            
+        sub_question_data = sub_question_ref.to_dict()
+        correct_answer = sub_question_data.get("correct_answer")
+        sub_question_text = sub_question_data.get("text", "")
+        points = sub_question_data.get("points", 1)
+        
+        # Initialize result for this sub-question
+        result = {
+            "sub_question_id": sub_question_id,
+            "sub_question_text": sub_question_text,
+            "is_correct": False,
+            "detected_value": None,
+            "expected_value": correct_answer,
+            "annotated_image_url": None
+        }
+        
+        # Process answer based on answer method
+        if answer_method == AnswerMethod.ABACUS:
+            # Check answer using the abacus service
+            is_correct, detected_value, annotated_image_path = check_abacus_answer(
+                base64_image, correct_answer
+            )
+            
+            # Update result data
+            result["is_correct"] = is_correct
+            result["detected_value"] = detected_value
+            
+            # If there's an annotated image path, copy it to the static folder
+            if annotated_image_path and os.path.exists(annotated_image_path):
+                static_uploads = os.path.join(current_app.static_folder, "uploads")
+                os.makedirs(static_uploads, exist_ok=True)
+                
+                filename = os.path.basename(annotated_image_path)
+                static_path = os.path.join(static_uploads, filename)
+                shutil.copy(annotated_image_path, static_path)
+                
+                # Add the public URL to the result
+                result["annotated_image_url"] = f"/static/uploads/{filename}"
+            
+            # Save attempt to database
+            captured_images = {image_key: base64_image}
+            if result["annotated_image_url"]:
+                captured_images["annotated_image"] = result["annotated_image_url"]
+                
+            result_data = {
+                "detected_value": detected_value,
+                "expected_value": correct_answer,
+            }
+            
+            attempted = AttemptedQuestion(
+                user_id=current_user.id,
+                question_id=question_id,
+                sub_question_id=sub_question_id,
+                is_correct=is_correct,
+                images=captured_images,
+                result_data=result_data
+            )
+            attempted.save()
+            
+            # Update counters
+            if is_correct:
+                correct_count += 1
+                total_points += points
+                
+        # Add to results list
+        response_data["results"].append(result)
+    
+    # Update quiz profile
+    kinesthetic_profile = QuizProfile.get_by_user_id(current_user.id)
+    if kinesthetic_profile:
+        # Add points to the profile
+        kinesthetic_profile.total_score += total_points
+        
+        # Update attempts counter (this counts as one attempt regardless of sub-questions)
+        kinesthetic_profile.current_lesson_attempts += 1
+        
+        # Check if lesson is complete
+        subject = request.args.get("subject", Subject.ADDITION)
+        if kinesthetic_profile.current_lesson_attempts >= 5:
+            kinesthetic_profile.completed_lessons.append(subject)
+            kinesthetic_profile.current_lesson_attempts = 0
+            response_data["lesson_completed"] = True
+            
+        kinesthetic_profile.save()
+    
+    return jsonify(response_data)

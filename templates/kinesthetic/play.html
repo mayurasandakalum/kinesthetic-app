@@ -54,25 +54,30 @@
         {{ question.text|safe }}
       </div>
 
-      <!-- Sub questions in accordion -->
-      <div class="sub-questions-container">
-        {% for sub_q in question.sub_questions %}
-        <div class="sub-question">
-          <button class="sub-question-header" onclick="toggleSubQuestion({{ loop.index }})">
-            <span class="sub-question-title">{{ sub_q.text }}</span>
-            <div class="sub-question-badges">
-              <span class="badge badge-primary">ලකුණු {{ sub_q.points }}</span>
-              <span class="badge badge-secondary">මට්ටම {{ sub_q.difficulty_level }}</span>
-            </div>
-          </button>
+      <!-- Single form for all sub-questions -->
+      <form method="POST" action="{{ url_for('kinesthetic.process_all_answers') }}" class="all-answers-form"
+        enctype="multipart/form-data" onsubmit="return submitAllAnswers(this, event)">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="question_pk" value="{{ question.id }}">
+        <input type="hidden" name="answer_method" value="{{ question.answer_method }}">
 
-          <div id="subQuestion{{ loop.index }}" class="sub-question-content">
-            <form method="POST" action="{{ url_for('kinesthetic.process_answer') }}" class="answer-form"
-              enctype="multipart/form-data" onsubmit="return submitAnswer(this, event)">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="question_pk" value="{{ question.id }}">
-              <input type="hidden" name="answer_method" value="{{ question.answer_method }}">
-              <input type="hidden" name="sub_question_id" value="{{ sub_q.id }}">
+        <!-- Sub questions in accordion -->
+        <div class="sub-questions-container">
+          {% for sub_q in question.sub_questions %}
+          <div class="sub-question">
+            <button type="button" class="sub-question-header" onclick="toggleSubQuestion({{ loop.index }})">
+              <span class="sub-question-title">{{ sub_q.text }}</span>
+              <div class="sub-question-badges">
+                <span class="badge badge-primary">ලකුණු {{ sub_q.points }}</span>
+                <span class="badge badge-secondary">මට්ටම {{ sub_q.difficulty_level }}</span>
+              </div>
+              <div class="completion-indicator" id="completionIndicator{{ loop.index }}">
+                <i class="fa fa-circle-o"></i>
+              </div>
+            </button>
+
+            <div id="subQuestion{{ loop.index }}" class="sub-question-content">
+              <input type="hidden" name="sub_question_ids" value="{{ sub_q.id }}">
 
               <!-- Instructions -->
               {% if sub_q.instructions %}
@@ -120,34 +125,41 @@
                     onchange="switchCamera(this, 'webcam{{ loop.index }}')">
                     <option value="">කැමරාව තෝරන්න...</option>
                   </select>
-                  <button type="button" class="btn btn-primary mt-3" onclick="captureImage('webcam{{ loop.index }}')"
+                  <button type="button" class="btn btn-primary mt-3"
+                    onclick="captureImage('webcam{{ loop.index }}', '{{ sub_q.id }}', {{ loop.index }})"
                     style="display: none;" id="capture{{ loop.index }}">
                     <i class="fa fa-camera"></i> පිංතූරය ගන්න
                   </button>
                 </div>
 
-                <!-- Submit button -->
-                <button type="submit" class="btn btn-success mt-3" id="submitBtn{{ loop.index }}">
-                  <i class="fa fa-paper-plane"></i> පිළිතුර යවන්න
-                </button>
-              </div>
-
-              <!-- Hint section -->
-              {% if sub_q.hint %}
-              <div class="hint-section">
-                <button class="btn btn-hint" type="button" onclick="toggleHint({{ loop.index }})">
-                  <i class="fa fa-lightbulb-o"></i>උදව්වක් ලබා ගන්න
-                </button>
-                <div id="hint{{ loop.index }}" class="hint-content" style="display: none;">
-                  {{ sub_q.hint }}
+                <!-- Hint section -->
+                {% if sub_q.hint %}
+                <div class="hint-section">
+                  <button type="button" class="btn btn-hint" onclick="toggleHint({{ loop.index }})">
+                    <i class="fa fa-lightbulb-o"></i>උදව්වක් ලබා ගන්න
+                  </button>
+                  <div id="hint{{ loop.index }}" class="hint-content" style="display: none;">
+                    {{ sub_q.hint }}
+                  </div>
                 </div>
+                {% endif %}
               </div>
-              {% endif %}
-            </form>
+            </div>
           </div>
+          {% endfor %}
         </div>
-        {% endfor %}
-      </div>
+
+        <!-- Submit all answers button -->
+        <div class="submit-all-container">
+          <p class="answer-status">
+            <span id="capturedAnswersCount">0</span> / <span id="totalSubQuestions">{{ question.sub_questions|length
+              }}</span> අනු ප්‍රශ්න සඳහා පිළිතුරු සපයා ඇත
+          </p>
+          <button type="submit" class="btn btn-success submit-all-btn" id="submitAllBtn" disabled>
+            <i class="fa fa-paper-plane"></i> සියලුම පිළිතුරු යවන්න
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -156,47 +168,41 @@
 <div class="loading-overlay" id="loadingOverlay">
   <div class="loading-content">
     <div class="spinner"></div>
-    <h3>ඔබගේ පිළිතුර පරීක්ෂා කරමින්...</h3>
-    <p>අපි ඡායාරූපය විශ්ලේෂණය කරමින් සිටිමු, කරුණාකර රැඳී සිටින්න.</p>
+    <h3>ඔබගේ පිළිතුරු පරීක්ෂා කරමින්...</h3>
+    <p>අපි ඡායාරූප විශ්ලේෂණය කරමින් සිටිමු, කරුණාකර රැඳී සිටින්න.</p>
   </div>
 </div>
 
-<!-- Result Modal -->
+<!-- Updated Result Modal for displaying multiple results -->
 <div class="modal-overlay" id="resultModal">
-  <div class="result-modal correct-modal" id="resultModalContainer">
+  <div class="result-modal" id="resultModalContainer">
     <div class="bg-pattern"></div>
     <div class="modal-header">
       <div class="modal-icon" id="modalIcon">
-        <!-- Correct icon (default) -->
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-          <polyline points="22 4 12 14.01 9 11.01"></polyline>
-        </svg>
+        <!-- Icon will be dynamically set by JavaScript -->
       </div>
       <h3 class="modal-title" id="modalTitle">නිවැරදියි!</h3>
     </div>
 
     <div class="modal-content">
-      <div class="result-row">
-        <span class="result-label">ඔබ පෙන්වූ පිළිතුර</span>
-        <span class="result-value" id="userAnswer">6408</span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">නිවැරදි පිළිතුර</span>
-        <span class="result-value" id="correctAnswer">6408</span>
+      <!-- Results summary -->
+      <div class="results-summary">
+        <div class="summary-heading">ඔබගේ ප්‍රතිඵල සාරාංශය:</div>
+        <div class="summary-stats">
+          <div class="stat-item">
+            <span class="stat-label">නිවැරදි පිළිතුරු:</span>
+            <span class="stat-value correct-count" id="correctAnswersCount">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">වැරදි පිළිතුරු:</span>
+            <span class="stat-value wrong-count" id="wrongAnswersCount">0</span>
+          </div>
+        </div>
       </div>
 
-      <div class="modal-message" id="modalMessage">
-        <span class="emoji">🎉</span>
-        <span>එම නිසා ඔබේ පිළිතුර නිවැරදියි!</span>
-        <span class="emoji">🎊</span>
-      </div>
-
-      <!-- Analysis image preview -->
-      <div class="result-image" id="resultImageContainer" style="display: none;">
-        <h4 class="image-title">විශ්ලේෂණය කරන ලද පිංතූරය</h4>
-        <img id="resultImage" src="" alt="Analyzed abacus" class="img-fluid">
+      <!-- Detailed results for each sub-question -->
+      <div class="detailed-results" id="detailedResults">
+        <!-- Will be populated by JavaScript -->
       </div>
     </div>
 
