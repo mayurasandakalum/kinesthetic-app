@@ -667,6 +667,19 @@ data.results.forEach((result, index) => {
     resultItem.classList.add('result-item');
     resultItem.classList.add(result.is_correct ? 'correct' : 'wrong');
 
+    // Format the detected value display - for time questions within tolerance
+    let detectedValueDisplay = result.detected_value || 'හඳුනාගත නොහැක';
+    let additionalInfo = '';
+    
+    // Check if it's a time-based question (contains ':' in expected or detected value)
+    if (result.is_correct && 
+        (String(result.expected_value).includes(':') || String(result.detected_value).includes(':'))) {
+      if (result.detected_value !== result.expected_value) {
+        // Within tolerance case
+        additionalInfo = `<div class="time-tolerance-info">(±3 මිනිත්තු ඉවසීම තුළ නිවැරදියි)</div>`;
+      }
+    }
+
     resultItem.innerHTML = `
     <div class="result-header">
         <div class="result-icon">
@@ -679,7 +692,8 @@ data.results.forEach((result, index) => {
     <div class="result-details">
         <div class="result-row">
         <span class="result-label">ඔබ පෙන්වූ පිළිතුර</span>
-        <span class="result-value">${result.detected_value || 'හඳුනාගත නොහැක'}</span>
+        <span class="result-value">${detectedValueDisplay}</span>
+        ${additionalInfo}
         </div>
         <div class="result-row">
         <span class="result-label">නිවැරදි පිළිතුර</span>

@@ -648,6 +648,23 @@
   margin-top: 15px;
 }
 
+/* Time tolerance info styling */
+.time-tolerance-info {
+  display: block;
+  color: #047857;
+  font-size: 0.85rem;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.time-tolerance {
+  display: block;
+  color: #047857;
+  font-style: italic;
+  font-size: 0.9rem;
+  margin-top: 5px;
+}
+
 /* Responsiveness */
 @media (max-width: 768px) {
   .card {

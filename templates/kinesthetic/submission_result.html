@@ -14,6 +14,16 @@
         {% if attempted_question.is_correct %}
         <h4 class="text-success">
           <i class="fa fa-check-circle"></i> නිවැරදියි!! සුබ පැතුම්! 🙌
+
+          <!-- Add time tolerance message if detected value differs from expected but answer is correct -->
+          {% if attempted_question.result_data.detected_value != attempted_question.result_data.expected_value %}
+          {% if ':' in attempted_question.result_data.detected_value or ':' in
+          attempted_question.result_data.expected_value %}
+          <div class="time-tolerance">
+            <small>(±3 මිනිත්තු ඉවසීම තුළ පිළිගත හැකිය)</small>
+          </div>
+          {% endif %}
+          {% endif %}
         </h4>
         {% else %}
         <h4 class="text-danger">
