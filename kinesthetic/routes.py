@@ -24,7 +24,8 @@ from .forms import (
     QuestionForm,
     SubQuestionForm,
 )
-from services.abacus_service import check_abacus_answer  # Add this import
+from services.abacus_service import check_abacus_answer
+from services.clock_service import check_clock_answer  # Add this import
 
 db = firestore.client()
 
@@ -130,18 +131,27 @@ def play():
                 is_correct, detected_value, annotated_image_path = check_abacus_answer(
                     base64_image, correct_answer
                 )
+            elif (answer_method == AnswerMethod.ANALOG_CLOCK or 
+                  answer_method == AnswerMethod.DIGITAL_CLOCK) and captured_images:
+                # Get the first captured image
+                base64_image = next(iter(captured_images.values()))
                 
-                # If there's an annotated image path, copy it to the static folder
-                if annotated_image_path and os.path.exists(annotated_image_path):
-                    static_uploads = os.path.join(current_app.static_folder, "uploads")
-                    os.makedirs(static_uploads, exist_ok=True)
-                    
-                    filename = os.path.basename(annotated_image_path)
-                    static_path = os.path.join(static_uploads, filename)
-                    shutil.copy(annotated_image_path, static_path)
-                    
-                    # Add the path to captured_images
-                    captured_images["annotated_image"] = f"/static/uploads/{filename}"
+                # Check answer using the clock service
+                is_correct, detected_value, annotated_image_path = check_clock_answer(
+                    base64_image, correct_answer
+                )
+            
+            # If there's an annotated image path, copy it to the static folder
+            if annotated_image_path and os.path.exists(annotated_image_path):
+                static_uploads = os.path.join(current_app.static_folder, "uploads")
+                os.makedirs(static_uploads, exist_ok=True)
+                
+                filename = os.path.basename(annotated_image_path)
+                static_path = os.path.join(static_uploads, filename)
+                shutil.copy(annotated_image_path, static_path)
+                
+                # Add the path to captured_images
+                captured_images["annotated_image"] = f"/static/uploads/{filename}"
             
             # Save attempt with detection results
             result_data = {
@@ -634,26 +644,35 @@ def process_answer():
         is_correct, detected_value, annotated_image_path = check_abacus_answer(
             base64_image, correct_answer
         )
+    elif (answer_method == AnswerMethod.ANALOG_CLOCK or 
+          answer_method == AnswerMethod.DIGITAL_CLOCK) and captured_images:
+        # Get the first captured image
+        base64_image = next(iter(captured_images.values()))
         
-        # Update response data with detection results
-        response_data['is_correct'] = is_correct
-        response_data['detected_value'] = detected_value
-        response_data['expected_value'] = correct_answer
+        # Check answer using the clock service
+        is_correct, detected_value, annotated_image_path = check_clock_answer(
+            base64_image, correct_answer
+        )
         
-        # If there's an annotated image path, copy it to the static folder
-        if annotated_image_path and os.path.exists(annotated_image_path):
-            static_uploads = os.path.join(current_app.static_folder, "uploads")
-            os.makedirs(static_uploads, exist_ok=True)
-            
-            filename = os.path.basename(annotated_image_path)
-            static_path = os.path.join(static_uploads, filename)
-            shutil.copy(annotated_image_path, static_path)
-            
-            # Add the public URL to the response
-            response_data['annotated_image_url'] = f"/static/uploads/{filename}"
-            
-            # Add the path to captured_images for database
-            captured_images["annotated_image"] = f"/static/uploads/{filename}"
+    # Update response data with detection results
+    response_data['is_correct'] = is_correct
+    response_data['detected_value'] = detected_value
+    response_data['expected_value'] = correct_answer
+    
+    # If there's an annotated image path, copy it to the static folder
+    if annotated_image_path and os.path.exists(annotated_image_path):
+        static_uploads = os.path.join(current_app.static_folder, "uploads")
+        os.makedirs(static_uploads, exist_ok=True)
+        
+        filename = os.path.basename(annotated_image_path)
+        static_path = os.path.join(static_uploads, filename)
+        shutil.copy(annotated_image_path, static_path)
+        
+        # Add the public URL to the response
+        response_data['annotated_image_url'] = f"/static/uploads/{filename}"
+        
+        # Add the path to captured_images for database
+        captured_images["annotated_image"] = f"/static/uploads/{filename}"
     
     # Save attempt with detection results
     result_data = {
@@ -754,48 +773,56 @@ def process_all_answers():
             is_correct, detected_value, annotated_image_path = check_abacus_answer(
                 base64_image, correct_answer
             )
-            
-            # Update result data
-            result["is_correct"] = is_correct
-            result["detected_value"] = detected_value
-            
-            # If there's an annotated image path, copy it to the static folder
-            if annotated_image_path and os.path.exists(annotated_image_path):
-                static_uploads = os.path.join(current_app.static_folder, "uploads")
-                os.makedirs(static_uploads, exist_ok=True)
-                
-                filename = os.path.basename(annotated_image_path)
-                static_path = os.path.join(static_uploads, filename)
-                shutil.copy(annotated_image_path, static_path)
-                
-                # Add the public URL to the result
-                result["annotated_image_url"] = f"/static/uploads/{filename}"
-            
-            # Save attempt to database
-            captured_images = {image_key: base64_image}
-            if result["annotated_image_url"]:
-                captured_images["annotated_image"] = result["annotated_image_url"]
-                
-            result_data = {
-                "detected_value": detected_value,
-                "expected_value": correct_answer,
-            }
-            
-            attempted = AttemptedQuestion(
-                user_id=current_user.id,
-                question_id=question_id,
-                sub_question_id=sub_question_id,
-                is_correct=is_correct,
-                images=captured_images,
-                result_data=result_data
+        elif answer_method == AnswerMethod.ANALOG_CLOCK or answer_method == AnswerMethod.DIGITAL_CLOCK:
+            # Check answer using the clock service
+            is_correct, detected_value, annotated_image_path = check_clock_answer(
+                base64_image, correct_answer
             )
-            attempted.save()
+        else:
+            # Unsupported answer method
+            continue
             
-            # Update counters
-            if is_correct:
-                correct_count += 1
-                total_points += points
-                
+        # Update result data
+        result["is_correct"] = is_correct
+        result["detected_value"] = detected_value
+        
+        # If there's an annotated image path, copy it to the static folder
+        if annotated_image_path and os.path.exists(annotated_image_path):
+            static_uploads = os.path.join(current_app.static_folder, "uploads")
+            os.makedirs(static_uploads, exist_ok=True)
+            
+            filename = os.path.basename(annotated_image_path)
+            static_path = os.path.join(static_uploads, filename)
+            shutil.copy(annotated_image_path, static_path)
+            
+            # Add the public URL to the result
+            result["annotated_image_url"] = f"/static/uploads/{filename}"
+        
+        # Save attempt to database
+        captured_images = {image_key: base64_image}
+        if result["annotated_image_url"]:
+            captured_images["annotated_image"] = result["annotated_image_url"]
+            
+        result_data = {
+            "detected_value": detected_value,
+            "expected_value": correct_answer,
+        }
+        
+        attempted = AttemptedQuestion(
+            user_id=current_user.id,
+            question_id=question_id,
+            sub_question_id=sub_question_id,
+            is_correct=is_correct,
+            images=captured_images,
+            result_data=result_data
+        )
+        attempted.save()
+        
+        # Update counters
+        if is_correct:
+            correct_count += 1
+            total_points += points
+            
         # Add to results list
         response_data["results"].append(result)
     
