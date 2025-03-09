@@ -1,9 +1,12 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, current_app
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from firebase_admin import firestore
-from datetime import datetime  # Add this import at the top
-import random  # Add this import
+from datetime import datetime
+import random
+import base64
+import os
+import shutil
 
 from .models import (
     User,
@@ -12,6 +15,7 @@ from .models import (
     AttemptedQuestion,
     SubQuestion,
     Subject,
+    AnswerMethod,
 )
 from .forms import (
     UserLoginForm,
@@ -19,7 +23,8 @@ from .forms import (
     QuizForm,
     QuestionForm,
     SubQuestionForm,
-)  # Added QuestionForm and SubQuestionForm
+)
+from services.abacus_service import check_abacus_answer  # Add this import
 
 db = firestore.client()
 
@@ -101,29 +106,56 @@ def play():
         # Get all the captured images
         captured_images = {}
         for key in request.form:
-            if key.startswith("captured_image_webcam"):
+            if key.startswith("captured_image_"):
                 captured_images[key] = request.form[key]
 
         # Get the sub-question to check correct answer
-        sub_question_ref = (
-            db.collection("sub_questions").document(sub_question_id).get()
-        )
+        sub_question_ref = db.collection("sub_questions").document(sub_question_id).get()
         if sub_question_ref.exists:
             sub_question_data = sub_question_ref.to_dict()
             correct_answer = sub_question_data.get("correct_answer")
             points = sub_question_data.get("points", 1)
 
-            # TODO: Implement image processing logic here
-            # is_correct = process_answer(answer_method, captured_images, correct_answer)
-            is_correct = True  # Temporary, replace with actual logic
-
-            # Save attempt
+            # Initialize variables
+            is_correct = False
+            detected_value = None
+            annotated_image_path = None
+            
+            # Process answer based on answer method
+            if answer_method == AnswerMethod.ABACUS and captured_images:
+                # Get the first captured image (we'll only use one for now)
+                base64_image = next(iter(captured_images.values()))
+                
+                # Check answer using the abacus service
+                is_correct, detected_value, annotated_image_path = check_abacus_answer(
+                    base64_image, correct_answer
+                )
+                
+                # If there's an annotated image path, copy it to the static folder
+                if annotated_image_path and os.path.exists(annotated_image_path):
+                    static_uploads = os.path.join(current_app.static_folder, "uploads")
+                    os.makedirs(static_uploads, exist_ok=True)
+                    
+                    filename = os.path.basename(annotated_image_path)
+                    static_path = os.path.join(static_uploads, filename)
+                    shutil.copy(annotated_image_path, static_path)
+                    
+                    # Add the path to captured_images
+                    captured_images["annotated_image"] = f"/static/uploads/{filename}"
+            
+            # Save attempt with detection results
+            result_data = {
+                "detected_value": detected_value,
+                "expected_value": correct_answer,
+            }
+            
             attempted = AttemptedQuestion(
                 user_id=current_user.id,
                 question_id=question_id,
                 sub_question_id=sub_question_id,
                 is_correct=is_correct,
                 images=captured_images,
+                result_data=result_data,  # Add results to the attempt record
             )
             attempted.save()
 
@@ -133,6 +165,10 @@ def play():
                 if kinesthetic_profile:
                     kinesthetic_profile.total_score += points
                     kinesthetic_profile.save()
+                    
+            # Pass the attempt ID to the result page
+            return redirect(url_for('kinesthetic.submission_result', 
+                                   attempted_question_id=attempted.id))
 
         # Update attempts counter
         kinesthetic_profile.current_lesson_attempts += 1
@@ -195,10 +231,51 @@ def play():
     )
 
 
-@kinesthetic_blueprint.route("/submission-result/<int:attempted_question_pk>")
+@kinesthetic_blueprint.route("/submission-result/<attempted_question_id>")
 @login_required
-def submission_result(attempted_question_pk):
-    attempted_question = AttemptedQuestion.query.get_or_404(attempted_question_pk)
+def submission_result(attempted_question_id):
+    # Get the attempted question from Firestore
+    attempted_doc = db.collection("attempted_questions").document(attempted_question_id).get()
+    
+    if not attempted_doc.exists:
+        flash("Attempt not found", "error")
+        return redirect(url_for('kinesthetic.play'))
+    
+    attempted_data = attempted_doc.to_dict()
+    
+    # Get the question details
+    question_doc = db.collection("questions").document(attempted_data.get("question_id", "")).get()
+    sub_question_doc = db.collection("sub_questions").document(attempted_data.get("sub_question_id", "")).get()
+    
+    if not question_doc.exists or not sub_question_doc.exists:
+        flash("Question details not found", "error")
+        return redirect(url_for('kinesthetic.play'))
+    
+    question_data = question_doc.to_dict()
+    sub_question_data = sub_question_doc.to_dict()
+    
+    # Prepare data for template
+    attempted_question = {
+        "id": attempted_question_id,
+        "is_correct": attempted_data.get("is_correct", False),
+        "images": attempted_data.get("images", {}),
+        "result_data": attempted_data.get("result_data", {}),
+        "question": {
+            "id": question_doc.id,
+            "text": question_data.get("text", ""),
+            "html": question_data.get("text", ""),  # For compatibility with template
+        },
+        "sub_question": {
+            "id": sub_question_doc.id,
+            "text": sub_question_data.get("text", ""),
+            "correct_answer": sub_question_data.get("correct_answer", ""),
+        },
+        "selected_choice": {  # Create a compatible structure for the template
+            "html": f"Detected value: {attempted_data.get('result_data', {}).get('detected_value', 'Unknown')}",
+            "is_correct": attempted_data.get("is_correct", False),
+        }
+    }
+    
     return render_template(
         "kinesthetic/submission_result.html", attempted_question=attempted_question
     )

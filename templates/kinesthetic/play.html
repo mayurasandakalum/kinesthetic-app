@@ -116,6 +116,10 @@
                     onclick="openCamera('webcam{{ loop.index }}', this)">
                     <i class="fa fa-video-camera"></i> කැමරාව විවෘත කරන්න
                   </button>
+                  <select id="cameraSelect{{ loop.index }}" class="form-control mt-2" style="display: none;"
+                    onchange="switchCamera(this, 'webcam{{ loop.index }}')">
+                    <option value="">කැමරාව තෝරන්න...</option>
+                  </select>
                   <button type="button" class="btn btn-primary mt-3" onclick="captureImage('webcam{{ loop.index }}')"
                     style="display: none;" id="capture{{ loop.index }}">
                     <i class="fa fa-camera"></i> පිංතූරය ගන්න
@@ -244,23 +248,52 @@
   // Modified capture image function
   function captureImage(webcamId) {
     console.log(`Capturing from ${webcamId}`);
+    const video = document.getElementById(webcamId);
+    const canvas = document.createElement('canvas');
+    const subQuestionId = webcamId.replace('webcam', '');
 
-    // For demonstration, randomly decide if answer is correct (70% chance of correct)
-    const isCorrect = Math.random() < 0.7;
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-    // Show the result modal with appropriate styling
-    showResultModal(isCorrect);
+    // Draw video frame to canvas
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // If correct, create confetti celebration
-    if (isCorrect) {
-      createConfetti();
-    }
+    // Get base64 image data
+    const imageData = canvas.toDataURL('image/jpeg');
 
-    // In a real implementation, you would:
-    // 1. Capture the image from webcam
-    // 2. Send to server for processing
-    // 3. Get result and display in modal
-    // 4. Show correct/wrong message based on result
+    // Add hidden input field with the captured image data
+    const form = video.closest('form');
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = `captured_image_${subQuestionId}`;
+    hiddenInput.value = imageData;
+    form.appendChild(hiddenInput);
+
+    // Show thumbnail of captured image
+    const thumbnailContainer = document.createElement('div');
+    thumbnailContainer.classList.add('capture-thumbnail-container');
+    thumbnailContainer.innerHTML = `
+      <div class="capture-thumbnail">
+        <img src="${imageData}" alt="Captured image">
+        <div class="capture-success">
+          <i class="fa fa-check-circle"></i>
+          <span>ඡායාරූපය ගනු ලැබීය</span>
+        </div>
+      </div>
+    `;
+
+    // Add the thumbnail after the video
+    const webcamContainer = video.closest('.webcam-container');
+    webcamContainer.appendChild(thumbnailContainer);
+
+    // Disable the capture button
+    const captureBtn = document.getElementById('capture' + subQuestionId);
+    captureBtn.disabled = true;
+    captureBtn.innerHTML = '<i class="fa fa-check"></i> ඡායාරූපය ලබා ගන්නා ලදී';
+
+    // Optional: Show alert
+    alert('ඡායාරූපය ගනු ලැබීය! පිළිතුර යැවීමට ඉදිරියට යන්න.');
   }
 
   // Function to show modal with correct/wrong styling
@@ -375,22 +408,68 @@
     }
   }
 
-  // Modified webcam functionality
-  function openCamera(webcamId, btnElement) {
+  // Add function to get available cameras
+  async function getAvailableCameras(selectElement) {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+      // Clear existing options except the first one
+      selectElement.innerHTML = '<option value="">කැමරාව තෝරන්න...</option>';
+
+      videoDevices.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Camera ${index + 1}`;
+        selectElement.appendChild(option);
+      });
+
+      selectElement.style.display = 'block';
+    } catch (error) {
+      console.error('Error getting cameras:', error);
+    }
+  }
+
+  // Modified openCamera function
+  async function openCamera(webcamId, btnElement) {
     const video = document.getElementById(webcamId);
     const captureBtn = document.getElementById('capture' + webcamId.replace('webcam', ''));
+    const cameraSelect = document.getElementById('cameraSelect' + webcamId.replace('webcam', ''));
 
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(function (stream) {
-          video.srcObject = stream;
-          video.play();
-          btnElement.style.display = 'none';  // Hide the open camera button
-          captureBtn.style.display = 'block'; // Show the capture button
-        })
-        .catch(function (error) {
-          console.error("Error accessing webcam:", error);
-        });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      video.play();
+      btnElement.style.display = 'none';
+      captureBtn.style.display = 'block';
+
+      // Get available cameras after initial camera is opened
+      await getAvailableCameras(cameraSelect);
+    } catch (error) {
+      console.error("Error accessing webcam:", error);
+    }
+  }
+
+  // Add function to switch camera
+  async function switchCamera(selectElement, webcamId) {
+    const video = document.getElementById(webcamId);
+    const deviceId = selectElement.value;
+
+    if (!deviceId) return;
+
+    // Stop current stream
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: deviceId } }
+      });
+      video.srcObject = stream;
+      video.play();
+    } catch (error) {
+      console.error('Error switching camera:', error);
     }
   }
 
@@ -413,5 +492,43 @@
     });
   }
 </script>
+
+<!-- Add CSS for the thumbnail display -->
+<style>
+  .capture-thumbnail-container {
+    margin-top: 10px;
+  }
+
+  .capture-thumbnail {
+    position: relative;
+    display: inline-block;
+    border: 2px solid #22c55e;
+    border-radius: 8px;
+    overflow: hidden;
+    max-width: 200px;
+  }
+
+  .capture-thumbnail img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .capture-success {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(34, 197, 94, 0.8);
+    color: white;
+    padding: 5px;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  .capture-success i {
+    margin-right: 5px;
+  }
+</style>
 {% endif %}
 {% endblock %}

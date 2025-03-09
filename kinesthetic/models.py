@@ -352,7 +352,8 @@ class SubQuestion:
 
 class AttemptedQuestion:
     def __init__(
-        self, user_id, question_id, sub_question_id=None, is_correct=False, images=None
+        self, user_id, question_id, sub_question_id=None, is_correct=False, images=None,
+        result_data=None
     ):
         self.id = str(uuid.uuid4())
         self.user_id = user_id
@@ -360,6 +361,7 @@ class AttemptedQuestion:
         self.sub_question_id = sub_question_id
         self.is_correct = is_correct
         self.images = images or {}
+        self.result_data = result_data or {}  # Store detection results
         self.attempted_at = datetime.utcnow()
 
     def save(self):
@@ -369,6 +371,7 @@ class AttemptedQuestion:
             "sub_question_id": self.sub_question_id,
             "is_correct": self.is_correct,
             "images": self.images,
+            "result_data": self.result_data,  # Add this field
             "attempted_at": self.attempted_at,
         }
         db.collection("attempted_questions").document(self.id).set(data)
