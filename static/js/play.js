@@ -240,6 +240,8 @@ async function openCamera(webcamId, btnElement) {
 const video = document.getElementById(webcamId);
 const captureBtn = document.getElementById('capture' + webcamId.replace('webcam', ''));
 const cameraSelect = document.getElementById('cameraSelect' + webcamId.replace('webcam', ''));
+const index = webcamId.replace('webcam', '');
+const mirrorBtn = document.getElementById('mirror' + index);
 
 try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -247,6 +249,12 @@ try {
     video.play();
     btnElement.style.display = 'none';
     captureBtn.style.display = 'block';
+    
+    // Make mirror button visible for time-related questions
+    const answerMethod = document.querySelector('input[name="answer_method"]').value;
+    if (answerMethod === 'analog_clock' || answerMethod === 'digital_clock') {
+    mirrorBtn.style.display = 'block';
+    }
 
     // Get available cameras after initial camera is opened
     await getAvailableCameras(cameraSelect);
@@ -449,13 +457,23 @@ function captureImage(webcamId, subQuestionId, index) {
     console.log(`Capturing from ${webcamId} for sub-question ${subQuestionId}`);
     const video = document.getElementById(webcamId);
     const canvas = document.createElement('canvas');
+    const mirrorBtn = document.getElementById('mirror' + index);
+    const isMirrored = mirrorBtn && mirrorBtn.getAttribute('data-mirrored') === 'true';
 
     // Set canvas dimensions to match video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
+    
+    const ctx = canvas.getContext('2d');
+    
+    // If mirrored, flip the image horizontally
+    if (isMirrored) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    
     // Draw video frame to canvas
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     // Get base64 image data
     const imageData = canvas.toDataURL('image/jpeg');
@@ -680,6 +698,22 @@ data.results.forEach((result, index) => {
 
 // Show modal
 modal.classList.add('active');
+}
+
+// Add function to toggle mirror mode
+function toggleMirror(index) {
+const video = document.getElementById('webcam' + index);
+const mirrorBtn = document.getElementById('mirror' + index);
+
+if (video.classList.contains('mirrored')) {
+    video.classList.remove('mirrored');
+    mirrorBtn.innerHTML = '<i class="fa fa-exchange"></i> පිංතූරය පෙරළන්න';
+    mirrorBtn.setAttribute('data-mirrored', 'false');
+} else {
+    video.classList.add('mirrored');
+    mirrorBtn.innerHTML = '<i class="fa fa-exchange"></i> සාමාන්ය පිංතූරය';
+    mirrorBtn.setAttribute('data-mirrored', 'true');
+}
 }
 
 // Initialize on page load

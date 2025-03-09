@@ -126,6 +126,11 @@
                     onchange="switchCamera(this, 'webcam{{ loop.index }}')">
                     <option value="">කැමරාව තෝරන්න...</option>
                   </select>
+                  <!-- Mirror button for clock questions (initially hidden) -->
+                  <button type="button" class="btn btn-secondary mt-2" id="mirror{{ loop.index }}"
+                    onclick="toggleMirror({{ loop.index }})" style="display: none;" data-mirrored="false">
+                    <i class="fa fa-exchange"></i> පිංතූරය පෙරළන්න
+                  </button>
                   <button type="button" class="btn btn-primary mt-3"
                     onclick="captureImage('webcam{{ loop.index }}', '{{ sub_q.id }}', {{ loop.index }})"
                     style="display: none;" id="capture{{ loop.index }}">

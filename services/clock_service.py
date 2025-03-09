@@ -124,6 +124,8 @@ def check_clock_answer(base64_image, expected_answer):
     """
     Check if the clock image shows the expected time
     Returns a tuple: (is_correct, detected_value, annotated_image_path)
+    
+    A tolerance of ±3 minutes is allowed for correct answers.
     """
     try:
         # Save the base64 image to a file
@@ -135,27 +137,73 @@ def check_clock_answer(base64_image, expected_answer):
         annotated_path = result['annotated_path']
         
         # Parse expected answer and format for comparison
-        # Expected format could be "HH:MM" or just "H:MM"
+        expected_minutes_total = 0
+        detected_minutes_total = 0
+        
+        # Parse expected time
         if ":" in expected_answer:
             parts = expected_answer.split(":")
             if len(parts) == 2:
                 expected_hour = int(parts[0])
                 expected_minute = int(parts[1])
                 expected_formatted = f"{expected_hour:02d}:{expected_minute:02d}"
+                expected_minutes_total = expected_hour * 60 + expected_minute
             else:
                 expected_formatted = expected_answer
         else:
             # If no colon, try to parse as a number of minutes
             try:
-                total_minutes = int(expected_answer)
-                expected_hour = total_minutes // 60
-                expected_minute = total_minutes % 60
+                expected_minutes_total = int(expected_answer)
+                expected_hour = expected_minutes_total // 60
+                expected_minute = expected_minutes_total % 60
                 expected_formatted = f"{expected_hour:02d}:{expected_minute:02d}"
             except ValueError:
                 expected_formatted = expected_answer
         
-        # Check if the detected time matches the expected time
-        is_correct = (detected_time == expected_formatted)
+        # Parse detected time
+        if ":" in detected_time:
+            parts = detected_time.split(":")
+            if len(parts) == 2:
+                detected_hour = int(parts[0])
+                detected_minute = int(parts[1])
+                detected_minutes_total = detected_hour * 60 + detected_minute
+        
+        # Check if the detected time is within ±3 minutes of the expected time
+        # First, check if we have valid times to compare
+        if expected_minutes_total > 0 and detected_minutes_total > 0:
+            # Calculate the difference in minutes
+            time_difference = abs(detected_minutes_total - expected_minutes_total)
+            
+            # Handle edge cases around 12 hours / 24 hours
+            if time_difference > 12 * 60 - 3:  # If we're near the day boundary
+                time_difference = 24 * 60 - time_difference
+            
+            # Check if within tolerance of 3 minutes
+            is_correct = (time_difference <= 3)
+            
+            # Add tolerance information to the annotated image
+            if os.path.exists(annotated_path):
+                original_img = cv2.imread(annotated_path)
+                if time_difference <= 3:
+                    status_text = f"Within tolerance: {time_difference} min diff (±3 min allowed)"
+                    color = (0, 255, 0)  # Green for correct
+                else:
+                    status_text = f"Outside tolerance: {time_difference} min diff (±3 min allowed)"
+                    color = (0, 0, 255)  # Red for incorrect
+                
+                cv2.putText(
+                    original_img,
+                    status_text,
+                    (10, 60),  # Position below the detected time
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    color,
+                    2,
+                )
+                cv2.imwrite(str(annotated_path), original_img)
+        else:
+            # If we couldn't parse the times properly, fall back to exact string comparison
+            is_correct = (detected_time == expected_formatted)
         
         return is_correct, detected_time, annotated_path
     
