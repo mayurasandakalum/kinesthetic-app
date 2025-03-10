@@ -87,6 +87,8 @@ class QuizProfile:
         self._user = None  # Cache for user object
         self.completed_lessons = []
         self.current_lesson_attempts = 0
+        self.mixed_quiz_completed = False  # To track if the mixed quiz is completed
+        self.subject_counts = {}  # To track how many questions from each subject have been shown
 
     @staticmethod
     def get_by_user_id(user_id):
@@ -101,6 +103,8 @@ class QuizProfile:
             )
             profile.completed_lessons = data.get("completed_lessons", [])
             profile.current_lesson_attempts = data.get("current_lesson_attempts", 0)
+            profile.mixed_quiz_completed = data.get("mixed_quiz_completed", False)
+            profile.subject_counts = data.get("subject_counts", {})
             return profile
         return None
 
@@ -112,6 +116,8 @@ class QuizProfile:
             "modified": self.modified,
             "completed_lessons": self.completed_lessons,
             "current_lesson_attempts": self.current_lesson_attempts,
+            "mixed_quiz_completed": self.mixed_quiz_completed,
+            "subject_counts": self.subject_counts,
         }
         db.collection("kinesthetic_profiles").document(str(self.user_id)).set(data)
 

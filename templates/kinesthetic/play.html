@@ -36,16 +36,16 @@
     <!-- Progress indicator with modern style -->
     <div class="progress-container">
       <div class="progress-outer">
-        <div class="progress-inner" style="width: {{ ((5 - (remaining_questions or 5)) * 20) }}%">
+        <div class="progress-inner" style="width: {{ ((15 - (remaining_questions or 15)) * 100 / 15) }}%">
           <div class="progress-shine"></div>
         </div>
       </div>
-      <div class="progress-text">{{ 5 - (remaining_questions or 5) }}/5 Questions</div>
+      <div class="progress-text">{{ 15 - (remaining_questions or 15) }}/15 Questions</div>
     </div>
 
     <div class="alert">
       <i class="fa fa-info-circle"></i>
-      <span class="alert-text">තව ප්‍රශ්න {{ remaining_questions or 5 }} යි</span>
+      <span class="alert-text">තව ප්‍රශ්න {{ remaining_questions or 15 }} යි</span>
     </div>
 
     <div class="question-content">

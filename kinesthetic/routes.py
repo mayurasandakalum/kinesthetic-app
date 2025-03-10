@@ -79,24 +79,9 @@ def play():
         kinesthetic_profile = QuizProfile(user_id=current_user.id)
         kinesthetic_profile.save()
 
-    subject = request.args.get("subject", Subject.ADDITION)
-
-    # Check if user has completed all lessons
-    if len(kinesthetic_profile.completed_lessons) == len(Subject.CHOICES):
+    # Check if user has completed all 15 questions
+    if kinesthetic_profile.mixed_quiz_completed:
         return render_template("kinesthetic/all_lessons_completed.html")
-
-    # Check if current subject is completed and redirect to next subject
-    if subject in kinesthetic_profile.completed_lessons:
-        next_subject = None
-        for s, _ in Subject.CHOICES:
-            if s not in kinesthetic_profile.completed_lessons:
-                next_subject = s
-                break
-        if next_subject:
-            return redirect(
-                url_for("kinesthetic.lesson_instructions", subject=next_subject)
-            )
-        return redirect(url_for("kinesthetic.leaderboard"))
 
     # Handle POST request for answering questions
     if request.method == "POST":
@@ -196,47 +181,71 @@ def play():
         return redirect(url_for("kinesthetic.play", subject=subject))
 
     # Handle GET request
-    # Get 5 random questions for the current subject
+    # Get all available questions for all subjects
     questions_ref = (
         db.collection("questions")
-        .where("subject", "==", subject)
         .where("is_published", "==", True)
         .get()
     )
-    available_questions = [Question.from_doc(q) for q in questions_ref]
+    all_available_questions = [Question.from_doc(q) for q in questions_ref]
 
-    if not available_questions:
-        flash("No questions available for this subject.", "warning")
+    # Check if there are any questions available
+    if not all_available_questions:
+        flash("No questions available.", "warning")
         return redirect(url_for("kinesthetic.user_home"))
 
-    # Add default value for remaining_questions
-    remaining_questions = 5 - (kinesthetic_profile.current_lesson_attempts or 0)
+    # Add default value for remaining_questions (out of 15 total)
+    total_questions = 15
+    remaining_questions = total_questions - (kinesthetic_profile.current_lesson_attempts or 0)
 
-    if kinesthetic_profile.current_lesson_attempts >= 5:
-        kinesthetic_profile.completed_lessons.append(subject)
-        kinesthetic_profile.current_lesson_attempts = 0
+    if kinesthetic_profile.current_lesson_attempts >= total_questions:
+        kinesthetic_profile.mixed_quiz_completed = True
         kinesthetic_profile.save()
-
-        # Find next subject
-        next_subject = None
-        for s, _ in Subject.CHOICES:
-            if s not in kinesthetic_profile.completed_lessons:
-                next_subject = s
-                break
-
-        if next_subject:
-            return redirect(
-                url_for("kinesthetic.lesson_instructions", subject=next_subject)
-            )
         return redirect(url_for("kinesthetic.leaderboard"))
 
-    # Select a random question
-    question = random.choice(available_questions)
+    # Group questions by subject to ensure we pick a good mix
+    questions_by_subject = {}
+    for question in all_available_questions:
+        if question.subject not in questions_by_subject:
+            questions_by_subject[question.subject] = []
+        questions_by_subject[question.subject].append(question)
+
+    # Select a random question, trying to balance subjects
+    available_subjects = list(questions_by_subject.keys())
+    
+    # If we've already seen questions from this profile, try to pick 
+    # from subjects we've seen less often
+    subject_counts = kinesthetic_profile.subject_counts if hasattr(kinesthetic_profile, 'subject_counts') else {}
+    
+    # Default to a random subject if we can't determine which one to pick
+    if not available_subjects:
+        flash("No subjects have available questions.", "warning")
+        return redirect(url_for("kinesthetic.user_home"))
+
+    # Try to pick the subject with the lowest count
+    min_count = float('inf')
+    selected_subject = random.choice(available_subjects)
+    
+    for subject in available_subjects:
+        count = subject_counts.get(subject, 0)
+        if count < min_count and questions_by_subject[subject]:
+            min_count = count
+            selected_subject = subject
+    
+    # Now get a random question from the selected subject
+    question = random.choice(questions_by_subject[selected_subject])
+    
+    # Update the subject counts for this profile
+    if not hasattr(kinesthetic_profile, 'subject_counts'):
+        kinesthetic_profile.subject_counts = {}
+    
+    kinesthetic_profile.subject_counts[selected_subject] = kinesthetic_profile.subject_counts.get(selected_subject, 0) + 1
+    kinesthetic_profile.save()
 
     return render_template(
         "kinesthetic/play.html",
         question=question,
-        subject=subject,
+        subject=selected_subject,  # Pass the subject for the current question
         remaining_questions=remaining_questions,
     )
 
@@ -732,7 +741,7 @@ def process_all_answers():
         "success": True,
         "results": [],
         "subject": subject,
-        "redirect_url": url_for("kinesthetic.play", subject=subject)
+        "redirect_url": url_for("kinesthetic.play")  # No subject needed for mixed quiz
     }
     
     total_points = 0
@@ -835,12 +844,12 @@ def process_all_answers():
         # Update attempts counter (this counts as one attempt regardless of sub-questions)
         kinesthetic_profile.current_lesson_attempts += 1
         
-        # Check if lesson is complete
-        subject = request.args.get("subject", Subject.ADDITION)
-        if kinesthetic_profile.current_lesson_attempts >= 5:
-            kinesthetic_profile.completed_lessons.append(subject)
-            kinesthetic_profile.current_lesson_attempts = 0
-            response_data["lesson_completed"] = True
+        # Check if all questions are complete (15 total)
+        total_questions = 15
+        if kinesthetic_profile.current_lesson_attempts >= total_questions:
+            kinesthetic_profile.mixed_quiz_completed = True
+            response_data["quiz_completed"] = True
+            response_data["redirect_url"] = url_for("kinesthetic.leaderboard")
             
         kinesthetic_profile.save()
     
